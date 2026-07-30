@@ -1,417 +1,211 @@
 import React, { useState } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Search, Plus, Edit, UserCheck, ShieldAlert, ArrowLeftRight } from 'lucide-react';
+import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft } from 'lucide-react';
+import { Toast } from '../components/Toast';
 
 export const Farmers: React.FC = () => {
-  const { farmers, addFarmer, updateFarmer, users } = useDatabase();
+  const { farmers, addFarmer, updateFarmer } = useDatabase();
   const { user } = useAuth();
-
   const [search, setSearch] = useState('');
   const [villageFilter, setVillageFilter] = useState('');
-  
-  // Dialog State
   const [showModal, setShowModal] = useState(false);
   const [editingFarmer, setEditingFarmer] = useState<any | null>(null);
-
-  // Form Fields
-  const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [altMobile, setAltMobile] = useState('');
-  const [gender, setGender] = useState('MALE');
-  const [age, setAge] = useState('');
-  const [aadhaar, setAadhaar] = useState('');
-  const [village, setVillage] = useState('');
-  const [taluka, setTaluka] = useState('');
-  const [district, setDistrict] = useState('');
-  const [address, setAddress] = useState('');
-  const [animalType, setAnimalType] = useState('COW');
-  const [cowCount, setCowCount] = useState('');
-  const [buffaloCount, setBuffaloCount] = useState('');
-
+  const [name, setName] = useState(''); const [mobile, setMobile] = useState(''); const [altMobile, setAltMobile] = useState('');
+  const [gender, setGender] = useState('MALE'); const [age, setAge] = useState(''); const [aadhaar, setAadhaar] = useState('');
+  const [village, setVillage] = useState(''); const [taluka, setTaluka] = useState(''); const [district, setDistrict] = useState('');
+  const [address, setAddress] = useState(''); const [animalType, setAnimalType] = useState('COW');
+  const [cowCount, setCowCount] = useState(''); const [buffaloCount, setBuffaloCount] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [selectedFarmer, setSelectedFarmer] = useState<any | null>(null);
+  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); };
 
-  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleOpenAdd = () => {
-    setEditingFarmer(null);
-    setName('');
-    setMobile('');
-    setAltMobile('');
-    setGender('MALE');
-    setAge('');
-    setAadhaar('');
-    setVillage('');
-    setTaluka('');
-    setDistrict('');
-    setAddress('');
-    setAnimalType('COW');
-    setCowCount('');
-    setBuffaloCount('');
-    setShowModal(true);
-  };
-
-  const handleOpenEdit = (f: any) => {
-    setEditingFarmer(f);
-    setName(f.name);
-    setMobile(f.mobile);
-    setAltMobile(f.altMobile || '');
-    setGender(f.gender);
-    setAge(String(f.age));
-    setAadhaar(f.aadhaar || '');
-    setVillage(f.village);
-    setTaluka(f.taluka);
-    setDistrict(f.district);
-    setAddress(f.address);
-    setAnimalType(f.animalType);
-    setCowCount(String(f.cowCount));
-    setBuffaloCount(String(f.buffaloCount));
-    setShowModal(true);
-  };
+  const resetForm = () => { setName(''); setMobile(''); setAltMobile(''); setGender('MALE'); setAge(''); setAadhaar(''); setVillage(''); setTaluka(''); setDistrict(''); setAddress(''); setAnimalType('COW'); setCowCount(''); setBuffaloCount(''); };
+  const handleOpenAdd = () => { setEditingFarmer(null); resetForm(); setShowModal(true); };
+  const handleOpenEdit = (f: any) => { setEditingFarmer(f); setName(f.name); setMobile(f.mobile); setAltMobile(f.altMobile || ''); setGender(f.gender); setAge(String(f.age)); setAadhaar(f.aadhaar || ''); setVillage(f.village); setTaluka(f.taluka); setDistrict(f.district); setAddress(f.address); setAnimalType(f.animalType); setCowCount(String(f.cowCount)); setBuffaloCount(String(f.buffaloCount)); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !mobile || !age || !village || !taluka || !district || !address || !animalType) {
-      triggerToast('All fields marked as required must be filled.', 'error');
-      return;
-    }
-
-    const payload = {
-      name,
-      mobile,
-      altMobile: altMobile || undefined,
-      gender,
-      age: parseInt(age),
-      aadhaar: aadhaar || undefined,
-      village,
-      taluka,
-      district,
-      address,
-      animalType,
-      cowCount: cowCount ? parseInt(cowCount) : 0,
-      buffaloCount: buffaloCount ? parseInt(buffaloCount) : 0
-    };
-
+    if (!name || !mobile || !age || !village || !taluka || !district || !address) { triggerToast('All required fields must be filled.', 'error'); return; }
+    const payload = { name, mobile, altMobile: altMobile || undefined, gender, age: parseInt(age), aadhaar: aadhaar || undefined, village, taluka, district, address, animalType, cowCount: cowCount ? parseInt(cowCount) : 0, buffaloCount: buffaloCount ? parseInt(buffaloCount) : 0 };
     try {
-      if (editingFarmer) {
-        await updateFarmer(editingFarmer.id, payload);
-        triggerToast('Farmer profile updated successfully!');
-      } else {
-        await addFarmer(payload);
-        triggerToast('New farmer registered successfully!');
-      }
+      if (editingFarmer) { await updateFarmer(editingFarmer.id, payload); triggerToast('Farmer updated!'); }
+      else { await addFarmer(payload); triggerToast('Farmer registered!'); }
       setShowModal(false);
-    } catch (err: any) {
-      triggerToast(err.message || 'Registration failed', 'error');
-    }
+    } catch (err: any) { triggerToast(err.message || 'Failed', 'error'); }
   };
 
-  // Filtered farmers list
   const filteredFarmers = farmers.filter(f => {
-    const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || 
-                          f.id.toLowerCase().includes(search.toLowerCase()) || 
-                          f.mobile.includes(search);
+    const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.id.toLowerCase().includes(search.toLowerCase()) || f.mobile.includes(search);
     const matchesVillage = villageFilter === '' || f.village === villageFilter;
     return matchesSearch && matchesVillage;
   });
 
-  // Extract unique villages for filtering dropdown
   const uniqueVillages = Array.from(new Set(farmers.map(f => f.village)));
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="page-header">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">Farmer Management</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Directory of registered dairy milk producers</p>
+          <h1 className="page-title">Farmers</h1>
+          <p className="page-subtitle">Registered dairy milk producers</p>
         </div>
-        {user?.role === 'EMPLOYEE' && (
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center justify-center gap-2 bg-dairy-600 hover:bg-dairy-700 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition transform active:scale-98"
-          >
-            <Plus className="w-5 h-5" />
-            Register Farmer
-          </button>
-        )}
+        {user?.role === 'EMPLOYEE' && <button onClick={handleOpenAdd} className="btn-primary"><Plus className="w-4 h-4" /> Register farmer</button>}
       </div>
 
-      {/* Filters Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-2 relative">
-          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
-            <Search className="w-5 h-5" />
-          </span>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Farmer ID, Name, or Mobile number..."
-            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm font-semibold focus:outline-none"
-          />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by ID, name, or mobile..." className="input pl-10" />
         </div>
-        <select
-          value={villageFilter}
-          onChange={(e) => setVillageFilter(e.target.value)}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none"
-        >
-          <option value="">Filter by Village (All)</option>
-          {uniqueVillages.map(v => (
-            <option key={v} value={v}>{v}</option>
-          ))}
+        <select value={villageFilter} onChange={(e) => setVillageFilter(e.target.value)} className="select">
+          <option value="">All villages</option>
+          {uniqueVillages.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       </div>
 
-      {/* Farmers Grid list */}
       {filteredFarmers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFarmers.map((f) => (
-            <div key={f.id} className="glass-card rounded-3xl p-6 shadow-glass hover:shadow-glass-hover transition border border-white/50 dark:border-slate-800 flex flex-col justify-between">
-              
-              <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight">{f.name}</h3>
-                    <span className="text-[10px] font-bold text-slate-400 font-mono mt-0.5 block">{f.id}</span>
-                  </div>
-                  {user?.role === 'EMPLOYEE' && (
-                    <button
-                      onClick={() => handleOpenEdit(f)}
-                      className="p-2 text-slate-500 hover:text-dairy-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  )}
+        <div className="space-y-3">
+          {filteredFarmers.map((f, i) => (
+            <div key={f.id} onClick={() => setSelectedFarmer(f)} className="card p-5 flex flex-col sm:flex-row sm:items-center gap-4 opacity-0 animate-fade-in-up cursor-pointer hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.03}s` }}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="font-medium text-foreground text-body">{f.name}</h3>
+                  <span className="label text-muted font-mono">{f.id}</span>
+                  {user?.role === 'EMPLOYEE' && <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(f); }} className="btn-icon ml-auto"><Edit className="w-4 h-4" /></button>}
                 </div>
-
-                {/* Details */}
-                <div className="space-y-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <div className="flex items-center justify-between">
-                    <span>Mobile Number</span>
-                    <span className="text-slate-900 dark:text-white font-mono">{f.mobile}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Village</span>
-                    <span className="text-slate-900 dark:text-white">{f.village}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Taluka / District</span>
-                    <span className="text-slate-900 dark:text-white">{f.taluka}, {f.district}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Animal Count</span>
-                    <span className="text-slate-900 dark:text-white">{f.totalAnimals} ({f.animalType})</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-body-sm text-muted">
+                  <span className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {f.mobile}</span>
+                  <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {f.village}, {f.taluka}</span>
+                  <span>{f.totalAnimals} {f.animalType === 'BOTH' ? 'animals' : f.animalType === 'COW' ? 'cows' : 'buffalos'}</span>
                 </div>
               </div>
-
-              {/* Animal distribution badge */}
-              <div className="mt-5 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl flex items-center justify-around border border-slate-200/50 dark:border-slate-700/50">
-                <div className="text-center">
-                  <span className="text-[10px] text-slate-400 font-bold block">COWS</span>
-                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">{f.cowCount}</span>
+              <div className="flex items-center gap-4 sm:gap-6 text-center shrink-0">
+                <div>
+                  <span className="label text-muted block">Cows</span>
+                  <span className="text-data font-display text-primary-700">{f.cowCount}</span>
                 </div>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-                <div className="text-center">
-                  <span className="text-[10px] text-slate-400 font-bold block">BUFFALOS</span>
-                  <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">{f.buffaloCount}</span>
+                <div className="w-px h-8 bg-warm-200" />
+                <div>
+                  <span className="label text-muted block">Buffalos</span>
+                  <span className="text-data font-display text-primary-700">{f.buffaloCount}</span>
                 </div>
               </div>
-
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border">
-          <ShieldAlert className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <h3 className="font-bold text-slate-700 dark:text-slate-350">No Farmers Found</h3>
-          <p className="text-xs text-slate-450 mt-1">Try refining your search terms or register a new farmer.</p>
+        <div className="empty-state card p-12">
+          <ShieldAlert className="w-10 h-10 text-warm-300 mb-3" />
+          <p className="font-medium text-warm-700">No farmers found</p>
+          <p className="text-body-sm text-muted mt-1">Try adjusting your search.</p>
         </div>
       )}
 
-      {/* Modal Form */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 md:p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">
-              {editingFarmer ? 'Update Farmer Profile' : 'Farmer Registration Form'}
-            </h3>
-
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-display-md text-foreground mb-6">{editingFarmer ? 'Edit farmer' : 'Register farmer'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
-              
-              {/* Personal Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1 col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Ramesh Kumar"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    maxLength={10}
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Alternate Mobile</label>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    value={altMobile}
-                    onChange={(e) => setAltMobile(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
+              <div className="space-y-2"><label className="label">Full name *</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><label className="label">Mobile *</label><input type="tel" required maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">Alt mobile</label><input type="tel" maxLength={10} value={altMobile} onChange={(e) => setAltMobile(e.target.value)} className="input" /></div>
               </div>
-
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 col-span-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Aadhaar Number</label>
-                  <input
-                    type="text"
-                    value={aadhaar}
-                    onChange={(e) => setAadhaar(e.target.value)}
-                    placeholder="e.g. 1234-5678-9012"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Age *</label>
-                  <input
-                    type="number"
-                    required
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="e.g. 45"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
+                <div className="col-span-2 space-y-2"><label className="label">Aadhaar</label><input type="text" value={aadhaar} onChange={(e) => setAadhaar(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">Age *</label><input type="number" required value={age} onChange={(e) => setAge(e.target.value)} className="input" /></div>
               </div>
-
-              {/* Address details */}
-              <div className="grid grid-cols-3 gap-3 border-t pt-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Village *</label>
-                  <input
-                    type="text"
-                    required
-                    value={village}
-                    onChange={(e) => setVillage(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Taluka *</label>
-                  <input
-                    type="text"
-                    required
-                    value={taluka}
-                    onChange={(e) => setTaluka(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">District *</label>
-                  <input
-                    type="text"
-                    required
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1 col-span-3">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Full Address *</label>
-                  <input
-                    type="text"
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Street name, house details"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
+              <div className="grid grid-cols-3 gap-3 border-t border-warm-100 pt-4">
+                <div className="space-y-2"><label className="label">Village *</label><input type="text" required value={village} onChange={(e) => setVillage(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">Taluka *</label><input type="text" required value={taluka} onChange={(e) => setTaluka(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">District *</label><input type="text" required value={district} onChange={(e) => setDistrict(e.target.value)} className="input" /></div>
               </div>
-
-              {/* Cattle details */}
-              <div className="grid grid-cols-3 gap-3 border-t pt-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Animal Type *</label>
-                  <select
-                    value={animalType}
-                    onChange={(e) => setAnimalType(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  >
-                    <option value="COW">Cow</option>
-                    <option value="BUFFALO">Buffalo</option>
-                    <option value="BOTH">Both</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Cow Count</label>
-                  <input
-                    type="number"
-                    value={cowCount}
-                    onChange={(e) => setCowCount(e.target.value)}
-                    placeholder="0"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Buffalo Count</label>
-                  <input
-                    type="number"
-                    value={buffaloCount}
-                    onChange={(e) => setBuffaloCount(e.target.value)}
-                    placeholder="0"
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none"
-                  />
-                </div>
+              <div className="space-y-2"><label className="label">Address *</label><input type="text" required value={address} onChange={(e) => setAddress(e.target.value)} className="input" /></div>
+              <div className="grid grid-cols-3 gap-3 border-t border-warm-100 pt-4">
+                <div className="space-y-2"><label className="label">Animal type</label>
+                  <select value={animalType} onChange={(e) => setAnimalType(e.target.value)} className="select"><option value="COW">Cow</option><option value="BUFFALO">Buffalo</option><option value="BOTH">Both</option></select></div>
+                <div className="space-y-2"><label className="label">Cows</label><input type="number" value={cowCount} onChange={(e) => setCowCount(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">Buffalos</label><input type="number" value={buffaloCount} onChange={(e) => setBuffaloCount(e.target.value)} className="input" /></div>
               </div>
-
-              <div className="flex gap-3 justify-end pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-dairy-600 hover:bg-dairy-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md"
-                >
-                  {editingFarmer ? 'Save Changes' : 'Register Profile'}
-                </button>
+              <div className="flex gap-3 justify-end pt-4 border-t border-warm-100">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-ghost">Cancel</button>
+                <button type="submit" className="btn-primary">{editingFarmer ? 'Save changes' : 'Register'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Toast notifications */}
-      {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg glass-card ${
-          toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-        }`}>
-          <span className="text-sm font-semibold">{toast.msg}</span>
+      {selectedFarmer && (
+        <div className="modal-backdrop" onClick={() => setSelectedFarmer(null)}>
+          <div className="modal-content max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-6">
+              <button onClick={() => setSelectedFarmer(null)} className="btn-icon"><ArrowLeft className="w-4 h-4" /></button>
+              <div>
+                <h3 className="font-display text-display-md text-foreground">{selectedFarmer.name}</h3>
+                <span className="label text-muted font-mono">{selectedFarmer.id}</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+                  <Phone className="w-4 h-4 text-muted" />
+                  <div><span className="label text-muted block">Mobile</span><span className="text-body font-medium text-foreground">{selectedFarmer.mobile}</span></div>
+                </div>
+                {selectedFarmer.altMobile && (
+                  <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+                    <Phone className="w-4 h-4 text-muted" />
+                    <div><span className="label text-muted block">Alt mobile</span><span className="text-body font-medium text-foreground">{selectedFarmer.altMobile}</span></div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+                  <User className="w-4 h-4 text-muted" />
+                  <div><span className="label text-muted block">Gender</span><span className="text-body font-medium text-foreground">{selectedFarmer.gender}</span></div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+                  <Calendar className="w-4 h-4 text-muted" />
+                  <div><span className="label text-muted block">Age</span><span className="text-body font-medium text-foreground">{selectedFarmer.age}</span></div>
+                </div>
+                {selectedFarmer.aadhaar && (
+                  <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+                    <CreditCard className="w-4 h-4 text-muted" />
+                    <div><span className="label text-muted block">Aadhaar</span><span className="text-body font-medium text-foreground font-mono">{selectedFarmer.aadhaar}</span></div>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-warm-100 pt-4">
+                <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl mb-3">
+                  <MapPin className="w-4 h-4 text-muted" />
+                  <div><span className="label text-muted block">Address</span><span className="text-body font-medium text-foreground">{selectedFarmer.address}, {selectedFarmer.village}, {selectedFarmer.taluka}, {selectedFarmer.district}</span></div>
+                </div>
+              </div>
+
+              <div className="border-t border-warm-100 pt-4">
+                <span className="label text-muted block mb-3">Livestock</span>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 bg-primary-50 rounded-xl text-center">
+                    <span className="label text-muted block">Type</span>
+                    <span className="text-body font-medium text-primary-700">{selectedFarmer.animalType}</span>
+                  </div>
+                  <div className="p-3 bg-primary-50 rounded-xl text-center">
+                    <span className="label text-muted block">Cows</span>
+                    <span className="text-data-lg font-display text-primary-700">{selectedFarmer.cowCount}</span>
+                  </div>
+                  <div className="p-3 bg-primary-50 rounded-xl text-center">
+                    <span className="label text-muted block">Buffalos</span>
+                    <span className="text-data-lg font-display text-primary-700">{selectedFarmer.buffaloCount}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

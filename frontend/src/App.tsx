@@ -11,7 +11,6 @@ import { Collections } from './pages/Collections';
 import { Payments } from './pages/Payments';
 import { Attendance } from './pages/Attendance';
 import { Leaves } from './pages/Leaves';
-import { Routes as RoutesPage } from './pages/Routes';
 import { Reports } from './pages/Reports';
 
 // Route Guard to verify active JWT sessions
@@ -125,15 +124,6 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Leaves />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/routes" 
-              element={
-                <ProtectedRoute>
-                  <RoutesPage />
                 </ProtectedRoute>
               } 
             />

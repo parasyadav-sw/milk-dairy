@@ -1,285 +1,140 @@
 import React, { useState } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Calendar, Clock, MapPin, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Plus, Calendar, Clock, MapPin, ShieldAlert, User } from 'lucide-react';
+import { Toast } from '../components/Toast';
 
 export const Visits: React.FC = () => {
   const { visits, assignVisit, users, farmers } = useDatabase();
   const { user } = useAuth();
-
   const [dateFilter, setDateFilter] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('');
-  
-  // Dialog State
   const [showModal, setShowModal] = useState(false);
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [farmerId, setFarmerId] = useState('');
+  const [date, setDate] = useState(''); const [time, setTime] = useState('');
+  const [employeeId, setEmployeeId] = useState(''); const [farmerId, setFarmerId] = useState('');
   const [remarks, setRemarks] = useState('');
-
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); };
 
-  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleOpenAssign = () => {
-    setDate(new Date().toISOString().split('T')[0]);
-    setTime('08:00');
-    setEmployeeId('');
-    setFarmerId('');
-    setRemarks('');
-    setShowModal(true);
-  };
+  const handleOpenAssign = () => { setDate(new Date().toISOString().split('T')[0]); setTime('08:00'); setEmployeeId(user?.role === 'EMPLOYEE' ? String(user.id) : ''); setFarmerId(''); setRemarks(''); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || !time || !employeeId || !farmerId) {
-      triggerToast('All fields marked as required must be filled.', 'error');
-      return;
-    }
-
-    try {
-      await assignVisit({
-        date,
-        time,
-        employeeId: parseInt(employeeId),
-        farmerId,
-        remarks
-      });
-      triggerToast('Farmer visit assigned successfully!');
-      setShowModal(false);
-    } catch (err: any) {
-      triggerToast(err.message || 'Assignment failed', 'error');
-    }
+    if (!date || !time || !employeeId || !farmerId) { triggerToast('All required fields must be filled.', 'error'); return; }
+    try { await assignVisit({ date, time, employeeId: parseInt(employeeId), farmerId, remarks }); triggerToast('Visit assigned!'); setShowModal(false); }
+    catch (err: any) { triggerToast(err.message || 'Failed', 'error'); }
   };
 
-  // filter users depending on role
-  // Admins see all employees, Managers see their assigned employees
-  const availableEmployees = users.filter(u => {
-    if (u.role !== 'EMPLOYEE') return false;
-    if (user?.role === 'MANAGER') return u.managerId === user.id;
-    return true; // Admin sees all
-  });
+  const availableEmployees = users.filter(u => { if (u.role !== 'EMPLOYEE') return false; if (user?.role === 'MANAGER') return u.managerId === user.id; return true; });
 
-  // Filtered visits
   const filteredVisits = visits.filter(v => {
-    // If Employee, restrict to see their own visits
     if (user?.role === 'EMPLOYEE' && v.employeeId !== user.id) return false;
-    
-    // If Manager, restrict to see visits managed by them
     if (user?.role === 'MANAGER' && v.managerId !== user.id) return false;
-
     const matchesDate = dateFilter === '' || v.date === dateFilter;
     const matchesEmp = employeeFilter === '' || v.employeeId === parseInt(employeeFilter);
-    
     return matchesDate && matchesEmp;
   });
 
+  const statusStyles: Record<string, string> = {
+    COMPLETED: 'bg-forest-50 text-forest-700 border border-forest-200/60',
+    PENDING: 'bg-gold-50 text-gold-700 border border-gold-200/60',
+    CANCELLED: 'bg-red-50 text-error border border-red-200/60',
+  };
+
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="page-header">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">Farmer Visits</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold mt-0.5">Scheduling and tracking field agent routes</p>
+          <h1 className="page-title">Visits</h1>
+          <p className="page-subtitle">Schedule and track field visits</p>
         </div>
-        {user && ['ADMIN', 'MANAGER'].includes(user.role) && (
-          <button
-            onClick={handleOpenAssign}
-            className="inline-flex items-center justify-center gap-2 bg-dairy-600 hover:bg-dairy-700 text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition transform active:scale-98"
-          >
-            <Plus className="w-5 h-5" />
-            Assign Daily Visit
-          </button>
-        )}
+        <button onClick={handleOpenAssign} className="btn-primary"><Plus className="w-4 h-4" /> Assign visit</button>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="relative">
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none"
-          />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="input" />
         {user && ['ADMIN', 'MANAGER'].includes(user.role) && (
-          <select
-            value={employeeFilter}
-            onChange={(e) => setEmployeeFilter(e.target.value)}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none"
-          >
-            <option value="">Filter by Employee (All)</option>
-            {availableEmployees.map(emp => (
-              <option key={emp.id} value={emp.id}>{emp.name}</option>
-            ))}
+          <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="select sm:col-span-2">
+            <option value="">All employees</option>
+            {availableEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
           </select>
         )}
       </div>
 
-      {/* Visits list */}
       {filteredVisits.length > 0 ? (
-        <div className="glass-card rounded-3xl overflow-hidden border border-slate-200/60 dark:border-slate-800">
+        <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-100/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  <th className="px-6 py-4">Farmer</th>
-                  <th className="px-6 py-4">Schedule</th>
-                  <th className="px-6 py-4">Village</th>
-                  <th className="px-6 py-4">Assigned Agent</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4">Visit Notes / Remarks</th>
+            <table className="w-full text-left">
+              <thead><tr className="table-header">
+                <th className="table-header th">Farmer</th>
+                <th className="table-header th">Schedule</th>
+                <th className="table-header th">Village</th>
+                <th className="table-header th">Agent</th>
+                <th className="table-header th text-center">Status</th>
+                <th className="table-header th">Notes</th>
+              </tr></thead>
+              <tbody>{filteredVisits.map(v => (
+                <tr key={v.id} className="table-row">
+                  <td className="table-cell">
+                    <span className="font-medium text-foreground">{v.farmerName}</span>
+                    <span className="label text-muted font-mono block">{v.farmerId}</span>
+                  </td>
+                  <td className="table-cell text-body-sm text-muted">
+                    <div className="flex flex-col">
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {v.date}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {v.time}</span>
+                    </div>
+                  </td>
+                  <td className="table-cell text-body-sm">
+                    <span className="flex items-center gap-1 text-muted"><MapPin className="w-3 h-3" /> {v.village}</span>
+                  </td>
+                  <td className="table-cell">
+                    <span className="flex items-center gap-1.5 text-body-sm font-medium text-foreground">
+                      <User className="w-3 h-3 text-primary-600" /> {v.employeeName}
+                    </span>
+                  </td>
+                  <td className="table-cell text-center">
+                    <span className={`badge ${statusStyles[v.status] || 'badge-neutral'}`}>{v.status}</span>
+                  </td>
+                  <td className="table-cell text-body-sm text-muted italic max-w-[200px] truncate">{v.remarks || '—'}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm font-semibold">
-                {filteredVisits.map((v) => (
-                  <tr key={v.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition">
-                    <td className="px-6 py-4 text-slate-900 dark:text-white">
-                      <div>
-                        <span>{v.farmerName}</span>
-                        <span className="text-[10px] text-slate-400 font-bold font-mono mt-0.5 block">{v.farmerId}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col text-slate-600 dark:text-slate-400 text-xs">
-                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-slate-400" /> {v.date}</span>
-                        <span className="flex items-center gap-1 mt-0.5"><Clock className="w-3.5 h-3.5 text-slate-400" /> {v.time} AM</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {v.village}</span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-900 dark:text-white">{v.employeeName}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider ${
-                        v.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400' :
-                        v.status === 'PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400' :
-                        'bg-rose-100 text-rose-700'
-                      }`}>
-                        {v.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-550 dark:text-slate-400 font-normal italic text-xs max-w-xs truncate">
-                      {v.remarks || 'No notes added'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              ))}</tbody>
             </table>
           </div>
         </div>
       ) : (
-        <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border">
-          <ShieldAlert className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <h3 className="font-bold text-slate-700 dark:text-slate-350">No Visits Scheduled</h3>
-          <p className="text-xs text-slate-450 mt-1">There are no visits matching your search criteria.</p>
+        <div className="empty-state card p-12">
+          <ShieldAlert className="w-10 h-10 text-warm-300 mb-3" />
+          <p className="font-medium text-warm-700">No visits found</p>
+          <p className="text-body-sm text-muted mt-1">No visits match your criteria.</p>
         </div>
       )}
 
-      {/* Assign Visit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 md:p-8 animate-fade-in">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">
-              Schedule Daily Farmer Visit
-            </h3>
-
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-display-md text-foreground mb-6">Schedule visit</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Time *</label>
-                  <input
-                    type="time"
-                    required
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-sm font-semibold"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><label className="label">Date *</label><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></div>
+                <div className="space-y-2"><label className="label">Time *</label><input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="input" /></div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Assign Field Agent *</label>
-                <select
-                  required
-                  value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                >
-                  <option value="">Select Employee</option>
-                  {availableEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Select Target Farmer *</label>
-                <select
-                  required
-                  value={farmerId}
-                  onChange={(e) => setFarmerId(e.target.value)}
-                  className="w-full bg-slate-50 border rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none"
-                >
-                  <option value="">Select Farmer</option>
-                  {farmers.map(f => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.id} - {f.village})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Instruction Details / Remarks</label>
-                <textarea
-                  rows={2}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="e.g. Collect morning milk, check cow feeding plan"
-                  className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none resize-none"
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-dairy-600 hover:bg-dairy-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md"
-                >
-                  Schedule Visit
-                </button>
+              <div className="space-y-2"><label className="label">Agent *</label>
+                {user?.role === 'EMPLOYEE' ? (
+                  <input type="text" disabled value={user.name} className="input bg-warm-50" />
+                ) : (
+                  <select required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="select"><option value="">Select agent</option>{availableEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}</select>
+                )}</div>
+              <div className="space-y-2"><label className="label">Farmer *</label>
+                <select required value={farmerId} onChange={(e) => setFarmerId(e.target.value)} className="select"><option value="">Select farmer</option>{farmers.map(f => <option key={f.id} value={f.id}>{f.name} ({f.village})</option>)}</select></div>
+              <div className="space-y-2"><label className="label">Remarks</label><textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} className="input resize-none" /></div>
+              <div className="flex gap-3 justify-end pt-4 border-t border-warm-100">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-ghost">Cancel</button>
+                <button type="submit" className="btn-primary">Schedule</button>
               </div>
             </form>
           </div>
-        </div>
-      )}
-
-      {/* Toast notifications */}
-      {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg glass-card ${
-          toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
-        }`}>
-          <span className="text-sm font-semibold">{toast.msg}</span>
         </div>
       )}
     </div>
