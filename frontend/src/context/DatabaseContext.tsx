@@ -1,0 +1,1065 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+// --- DATA TYPES ---
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+  status: 'ACTIVE' | 'INACTIVE';
+  managerId?: number | null;
+  managerName?: string;
+  createdAt?: string;
+}
+
+export interface Farmer {
+  id: string;
+  name: string;
+  mobile: string;
+  altMobile?: string;
+  gender: string;
+  age: number;
+  aadhaar?: string;
+  village: string;
+  taluka: string;
+  district: string;
+  address: string;
+  gpsLocation?: string;
+  animalType: string;
+  cowCount: number;
+  buffaloCount: number;
+  totalAnimals: number;
+  registeredById: number;
+  registeredByName?: string;
+  createdAt: string;
+}
+
+export interface Route {
+  id: number;
+  name: string;
+  description?: string;
+  village: string;
+  managerId: number;
+  assignedEmployeeId?: number | null;
+  assignedEmployeeName?: string;
+}
+
+export interface Visit {
+  id: number;
+  date: string;
+  time: string;
+  employeeId: number;
+  employeeName: string;
+  managerId: number;
+  farmerId: string;
+  farmerName: string;
+  village: string;
+  remarks?: string;
+  nextVisitDate?: string;
+  gpsLocation?: string;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  photos?: string; // comma-separated image URLs
+}
+
+export interface MilkCollection {
+  id: number;
+  visitId?: number | null;
+  date: string;
+  timeOfDay: 'MORNING' | 'EVENING';
+  quantityLitres: number;
+  fatPercent: number;
+  snfPercent: number;
+  clr?: number | null;
+  ratePerLitre: number;
+  totalAmount: number;
+  collectedById: number;
+  collectedByName?: string;
+  farmerId: string;
+  farmerName?: string;
+  village?: string;
+  paymentStatus: 'PENDING' | 'PAID';
+  paymentId?: number | null;
+  createdAt: string;
+}
+
+export interface Payment {
+  id: number;
+  farmerId: string;
+  farmerName?: string;
+  village?: string;
+  amount: number;
+  paymentDate: string;
+  status: 'COMPLETED' | 'FAILED';
+  transactionRef?: string;
+  processedById: number;
+}
+
+export interface Attendance {
+  id: number;
+  userId: number;
+  userName?: string;
+  date: string;
+  status: 'PRESENT' | 'ABSENT' | 'LEAVE';
+  clockIn?: string;
+  clockOut?: string;
+}
+
+export interface Leave {
+  id: number;
+  userId: number;
+  userName: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedById?: number | null;
+  approvedByName?: string;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: number;
+  userName?: string;
+  action: string;
+  details: string;
+  timestamp: string;
+}
+
+interface DatabaseContextType {
+  isApiMode: boolean;
+  setApiMode: (val: boolean) => void;
+  users: User[];
+  farmers: Farmer[];
+  routes: Route[];
+  visits: Visit[];
+  collections: MilkCollection[];
+  payments: Payment[];
+  attendance: Attendance[];
+  leaves: Leave[];
+  auditLogs: AuditLog[];
+  refreshData: () => Promise<void>;
+  
+  // Mutating Operations
+  addUser: (data: Partial<User> & { password?: string }) => Promise<User>;
+  updateUser: (id: number, data: Partial<User>) => Promise<User>;
+  addFarmer: (data: Partial<Farmer>) => Promise<Farmer>;
+  updateFarmer: (id: string, data: Partial<Farmer>) => Promise<Farmer>;
+  addRoute: (data: Partial<Route>) => Promise<Route>;
+  updateRoute: (id: number, data: Partial<Route>) => Promise<Route>;
+  deleteRoute: (id: number) => Promise<void>;
+  assignVisit: (data: Partial<Visit>) => Promise<Visit>;
+  updateVisit: (id: number, data: Partial<Visit>) => Promise<Visit>;
+  recordMilk: (data: Partial<MilkCollection>) => Promise<MilkCollection>;
+  processPayment: (farmerId: string, txnRef?: string) => Promise<Payment>;
+  clockIn: (userId: number) => Promise<Attendance>;
+  clockOut: (userId: number) => Promise<Attendance>;
+  applyLeave: (userId: number, startDate: string, endDate: string, reason: string) => Promise<Leave>;
+  approveRejectLeave: (leaveId: number, status: 'APPROVED' | 'REJECTED', approverId: number) => Promise<Leave>;
+}
+
+const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
+
+// Helper for Mock Database Rates
+const calculateMockRate = (fat: number, snf: number) => {
+  return Math.round(((fat * 5.0) + (snf * 3.5)) * 100) / 100;
+};
+
+export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isApiMode, setApiMode] = useState<boolean>(() => {
+    return localStorage.getItem('dairy_api_mode') === 'true';
+  });
+
+  // Local State holding data
+  const [users, setUsers] = useState<User[]>([]);
+  const [farmers, setFarmers] = useState<Farmer[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [collections, setCollections] = useState<MilkCollection[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [leaves, setLeaves] = useState<Leave[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Seed Mock Data if not present in LocalStorage
+  useEffect(() => {
+    if (!localStorage.getItem('mock_seeded')) {
+      const initialUsers: User[] = [
+        { id: 1, email: 'admin@dairy.com', name: 'Ramesh Kumar (Admin)', role: 'ADMIN', status: 'ACTIVE' },
+        { id: 2, email: 'manager1@dairy.com', name: 'Vikram Singh (Manager)', role: 'MANAGER', status: 'ACTIVE' },
+        { id: 3, email: 'manager2@dairy.com', name: 'Sanjay Sharma (Manager)', role: 'MANAGER', status: 'ACTIVE' },
+        { id: 4, email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 2 },
+        { id: 5, email: 'employee2@dairy.com', name: 'Rahul Verma (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 2 },
+        { id: 6, email: 'employee3@dairy.com', name: 'Deepak Rao (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 3 }
+      ];
+
+      const initialFarmers: Farmer[] = [
+        { id: 'FMR-0001', name: 'Harish Choudhary', mobile: '9876543210', gender: 'MALE', age: 45, aadhaar: '1234-5678-9012', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'Plot 4, Near Temple, Rajpura', animalType: 'COW', cowCount: 5, buffaloCount: 0, totalAnimals: 5, registeredById: 4, createdAt: '2026-07-20T10:00:00.000Z' },
+        { id: 'FMR-0002', name: 'Ram Niwas', mobile: '9988776655', gender: 'MALE', age: 52, aadhaar: '2345-6789-0123', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'House 12, Main Road, Rajpura', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 4, totalAnimals: 4, registeredById: 4, createdAt: '2026-07-21T11:00:00.000Z' },
+        { id: 'FMR-0003', name: 'Sunita Devi', mobile: '9776655443', gender: 'FEMALE', age: 39, aadhaar: '3456-7890-1234', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Ward 2, Kalyanpur', animalType: 'BOTH', cowCount: 3, buffaloCount: 3, totalAnimals: 6, registeredById: 5, createdAt: '2026-07-22T09:30:00.000Z' },
+        { id: 'FMR-0004', name: 'Devendra Yadav', mobile: '9665544332', gender: 'MALE', age: 48, aadhaar: '4567-8901-2345', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Farmhouse 1A, Kalyanpur', animalType: 'COW', cowCount: 8, buffaloCount: 0, totalAnimals: 8, registeredById: 5, createdAt: '2026-07-23T14:15:00.000Z' },
+        { id: 'FMR-0005', name: 'Manoj Gurjar', mobile: '9554433221', gender: 'MALE', age: 34, aadhaar: '5678-9012-3456', village: 'Chandpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Sector 5, Chandpur', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 6, totalAnimals: 6, registeredById: 6, createdAt: '2026-07-24T12:00:00.000Z' }
+      ];
+
+      const initialRoutes: Route[] = [
+        { id: 1, name: 'Rajpura Route A', description: 'Covers northern farms of Rajpura', village: 'Rajpura', managerId: 2, assignedEmployeeId: 4 },
+        { id: 2, name: 'Kalyanpur Route B', description: 'Main Kalyanpur dairy route', village: 'Kalyanpur', managerId: 2, assignedEmployeeId: 5 },
+        { id: 3, name: 'Chandpur Route C', description: 'Covers Chandpur village', village: 'Chandpur', managerId: 3, assignedEmployeeId: 6 }
+      ];
+
+      const initialVisits: Visit[] = [
+        { id: 1, date: '2026-07-30', time: '07:30', employeeId: 4, employeeName: 'Amit Patel', managerId: 2, farmerId: 'FMR-0001', farmerName: 'Harish Choudhary', village: 'Rajpura', remarks: 'Morning milk check', status: 'PENDING' },
+        { id: 2, date: '2026-07-30', time: '08:00', employeeId: 4, employeeName: 'Amit Patel', managerId: 2, farmerId: 'FMR-0002', farmerName: 'Ram Niwas', village: 'Rajpura', remarks: 'Daily collection', status: 'PENDING' },
+        { id: 3, date: '2026-07-30', time: '07:45', employeeId: 5, employeeName: 'Rahul Verma', managerId: 2, farmerId: 'FMR-0003', farmerName: 'Sunita Devi', village: 'Kalyanpur', remarks: 'Morning checkup', status: 'COMPLETED', nextVisitDate: '2026-07-31', gpsLocation: '26.9124, 75.7873' },
+        { id: 4, date: '2026-07-30', time: '08:15', employeeId: 5, employeeName: 'Rahul Verma', managerId: 2, farmerId: 'FMR-0004', farmerName: 'Devendra Yadav', village: 'Kalyanpur', status: 'PENDING' }
+      ];
+
+      // Seed 7 days of collection history for charts
+      const initialCollections: MilkCollection[] = [];
+      const past7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i - 1);
+        return d.toISOString().split('T')[0];
+      }).reverse();
+
+      let colId = 1;
+      past7Days.forEach((date, dayIdx) => {
+        // Farmer 1 (Cow)
+        const qty1 = 12 + Math.sin(dayIdx) * 2;
+        const fat1 = 4.2 + Math.cos(dayIdx) * 0.2;
+        const snf1 = 8.6;
+        const rate1 = calculateMockRate(fat1, snf1);
+        initialCollections.push({
+          id: colId++,
+          date,
+          timeOfDay: 'MORNING',
+          quantityLitres: parseFloat(qty1.toFixed(1)),
+          fatPercent: parseFloat(fat1.toFixed(1)),
+          snfPercent: snf1,
+          ratePerLitre: rate1,
+          totalAmount: parseFloat((qty1 * rate1).toFixed(2)),
+          collectedById: 4,
+          farmerId: 'FMR-0001',
+          paymentStatus: 'PAID',
+          paymentId: 1,
+          createdAt: `${date}T08:00:00.000Z`
+        });
+
+        // Farmer 2 (Buffalo)
+        const qty2 = 8 + Math.cos(dayIdx) * 1.5;
+        const fat2 = 7.2 + Math.sin(dayIdx) * 0.3;
+        const snf2 = 9.2;
+        const rate2 = calculateMockRate(fat2, snf2);
+        initialCollections.push({
+          id: colId++,
+          date,
+          timeOfDay: 'MORNING',
+          quantityLitres: parseFloat(qty2.toFixed(1)),
+          fatPercent: parseFloat(fat2.toFixed(1)),
+          snfPercent: snf2,
+          ratePerLitre: rate2,
+          totalAmount: parseFloat((qty2 * rate2).toFixed(2)),
+          collectedById: 4,
+          farmerId: 'FMR-0002',
+          paymentStatus: 'PAID',
+          paymentId: 1,
+          createdAt: `${date}T08:30:00.000Z`
+        });
+
+        // Evening collections
+        initialCollections.push({
+          id: colId++,
+          date,
+          timeOfDay: 'EVENING',
+          quantityLitres: parseFloat((qty1 * 0.9).toFixed(1)),
+          fatPercent: parseFloat((fat1 + 0.1).toFixed(1)),
+          snfPercent: snf1,
+          ratePerLitre: calculateMockRate(fat1 + 0.1, snf1),
+          totalAmount: parseFloat(((qty1 * 0.9) * calculateMockRate(fat1 + 0.1, snf1)).toFixed(2)),
+          collectedById: 4,
+          farmerId: 'FMR-0001',
+          paymentStatus: 'PENDING',
+          createdAt: `${date}T18:00:00.000Z`
+        });
+      });
+
+      // Today's collections so far (completed visit 3)
+      initialCollections.push({
+        id: colId++,
+        visitId: 3,
+        date: '2026-07-30',
+        timeOfDay: 'MORNING',
+        quantityLitres: 15,
+        fatPercent: 4.5,
+        snfPercent: 8.8,
+        ratePerLitre: calculateMockRate(4.5, 8.8),
+        totalAmount: 15 * calculateMockRate(4.5, 8.8),
+        collectedById: 5,
+        farmerId: 'FMR-0003',
+        paymentStatus: 'PENDING',
+        createdAt: '2026-07-30T08:00:00.000Z'
+      });
+
+      const initialPayments: Payment[] = [
+        { id: 1, farmerId: 'FMR-0001', amount: 1500.00, paymentDate: '2026-07-28', status: 'COMPLETED', transactionRef: 'TXN-77889900', processedById: 1 },
+        { id: 2, farmerId: 'FMR-0002', amount: 2450.00, paymentDate: '2026-07-29', status: 'COMPLETED', transactionRef: 'TXN-11223344', processedById: 1 }
+      ];
+
+      const initialAttendance: Attendance[] = [
+        { id: 1, userId: 4, date: '2026-07-29', status: 'PRESENT', clockIn: '07:15', clockOut: '17:30' },
+        { id: 2, userId: 5, date: '2026-07-29', status: 'PRESENT', clockIn: '07:20', clockOut: '17:45' },
+        { id: 3, userId: 6, date: '2026-07-29', status: 'PRESENT', clockIn: '07:30', clockOut: '18:00' },
+        // Today
+        { id: 4, userId: 4, date: '2026-07-30', status: 'PRESENT', clockIn: '07:05' },
+        { id: 5, userId: 5, date: '2026-07-30', status: 'PRESENT', clockIn: '07:12' }
+      ];
+
+      const initialLeaves: Leave[] = [
+        { id: 1, userId: 5, userName: 'Rahul Verma', startDate: '2026-08-02', endDate: '2026-08-04', reason: 'Personal work at home town', status: 'PENDING', createdAt: '2026-07-29T10:00:00.000Z' },
+        { id: 2, userId: 6, userName: 'Deepak Rao', startDate: '2026-07-25', endDate: '2026-07-26', reason: 'Fever', status: 'APPROVED', approvedById: 3, approvedByName: 'Sanjay Sharma', createdAt: '2026-07-24T09:00:00.000Z' }
+      ];
+
+      const initialAuditLogs: AuditLog[] = [
+        { id: 1, userName: 'System Admin', action: 'SYSTEM_INIT', details: 'Database seeded with default mock data', timestamp: new Date().toISOString() }
+      ];
+
+      localStorage.setItem('users', JSON.stringify(initialUsers));
+      localStorage.setItem('farmers', JSON.stringify(initialFarmers));
+      localStorage.setItem('routes', JSON.stringify(initialRoutes));
+      localStorage.setItem('visits', JSON.stringify(initialVisits));
+      localStorage.setItem('collections', JSON.stringify(initialCollections));
+      localStorage.setItem('payments', JSON.stringify(initialPayments));
+      localStorage.setItem('attendance', JSON.stringify(initialAttendance));
+      localStorage.setItem('leaves', JSON.stringify(initialLeaves));
+      localStorage.setItem('auditLogs', JSON.stringify(initialAuditLogs));
+      localStorage.setItem('mock_seeded', 'true');
+    }
+
+    localStorage.setItem('dairy_api_mode', String(isApiMode));
+    refreshData();
+  }, [isApiMode]);
+
+  const refreshData = async () => {
+    if (isApiMode) {
+      const token = localStorage.getItem('dairy_token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+      try {
+        const [uRes, fRes, rRes, vRes, cRes, pRes, aRes, lRes, logRes] = await Promise.all([
+          fetch('/api/users', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/farmers', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/routes', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/visits', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/collections', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/payments', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/attendance', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/leaves', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/reports/audit-logs', { headers }).then(r => r.ok ? r.json() : [])
+        ]);
+
+        setUsers(uRes);
+        setFarmers(fRes);
+        setRoutes(rRes);
+        setVisits(vRes);
+        setCollections(cRes);
+        setPayments(pRes);
+        setAttendance(aRes);
+        setLeaves(lRes);
+        setAuditLogs(logRes);
+      } catch (err) {
+        console.error('API load failed, falling back to LocalStorage', err);
+        loadLocalStorage();
+      }
+    } else {
+      loadLocalStorage();
+    }
+  };
+
+  const loadLocalStorage = () => {
+    setUsers(JSON.parse(localStorage.getItem('users') || '[]'));
+    setFarmers(JSON.parse(localStorage.getItem('farmers') || '[]'));
+    setRoutes(JSON.parse(localStorage.getItem('routes') || '[]'));
+    setVisits(JSON.parse(localStorage.getItem('visits') || '[]'));
+    setCollections(JSON.parse(localStorage.getItem('collections') || '[]'));
+    setPayments(JSON.parse(localStorage.getItem('payments') || '[]'));
+    setAttendance(JSON.parse(localStorage.getItem('attendance') || '[]'));
+    setLeaves(JSON.parse(localStorage.getItem('leaves') || '[]'));
+    setAuditLogs(JSON.parse(localStorage.getItem('auditLogs') || '[]'));
+  };
+
+  // --- MUTATING API / MOCK ACTIONS ---
+
+  const addUser = async (data: Partial<User> & { password?: string }) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to create user');
+      const newUser = await res.json();
+      await refreshData();
+      return newUser;
+    } else {
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
+      const nextId = localUsers.reduce((max: number, u: any) => u.id > max ? u.id : max, 0) + 1;
+      const newUser: User = {
+        id: nextId,
+        email: data.email || '',
+        name: data.name || '',
+        role: data.role || 'EMPLOYEE',
+        status: 'ACTIVE',
+        managerId: data.managerId || (creator.role === 'MANAGER' ? creator.id : null),
+        createdAt: new Date().toISOString()
+      };
+      localUsers.push(newUser);
+      localStorage.setItem('users', JSON.stringify(localUsers));
+
+      // Log
+      logAudit(creator.name, 'CREATE_USER', `Created user ${newUser.name} (${newUser.role})`);
+      loadLocalStorage();
+      return newUser;
+    }
+  };
+
+  const updateUser = async (id: number, data: Partial<User>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update user');
+      const updated = await res.json();
+      await refreshData();
+      return updated;
+    } else {
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const idx = localUsers.findIndex(u => u.id === id);
+      if (idx === -1) throw new Error('User not found');
+      localUsers[idx] = { ...localUsers[idx], ...data };
+      localStorage.setItem('users', JSON.stringify(localUsers));
+
+      logAudit(creator.name, 'UPDATE_USER', `Updated user details for ${localUsers[idx].name}`);
+      loadLocalStorage();
+      return localUsers[idx];
+    }
+  };
+
+  const addFarmer = async (data: Partial<Farmer>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/farmers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to register farmer');
+      const newFarmer = await res.json();
+      await refreshData();
+      return newFarmer;
+    } else {
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      const farmerId = `FMR-${String(localFarmers.length + 1).padStart(4, '0')}`;
+      const cows = data.cowCount ? Number(data.cowCount) : 0;
+      const buffalos = data.buffaloCount ? Number(data.buffaloCount) : 0;
+      const newFarmer: Farmer = {
+        id: farmerId,
+        name: data.name || '',
+        mobile: data.mobile || '',
+        altMobile: data.altMobile,
+        gender: data.gender || 'MALE',
+        age: Number(data.age) || 30,
+        aadhaar: data.aadhaar,
+        village: data.village || '',
+        taluka: data.taluka || '',
+        district: data.district || '',
+        address: data.address || '',
+        gpsLocation: data.gpsLocation,
+        animalType: data.animalType || 'COW',
+        cowCount: cows,
+        buffaloCount: buffalos,
+        totalAnimals: cows + buffalos,
+        registeredById: creator.id || 4,
+        registeredByName: creator.name || 'Field Agent',
+        createdAt: new Date().toISOString()
+      };
+      localFarmers.push(newFarmer);
+      localStorage.setItem('farmers', JSON.stringify(localFarmers));
+
+      logAudit(creator.name, 'REGISTER_FARMER', `Registered farmer ${newFarmer.name} (${farmerId})`);
+      loadLocalStorage();
+      return newFarmer;
+    }
+  };
+
+  const updateFarmer = async (id: string, data: Partial<Farmer>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/farmers/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update farmer');
+      const updated = await res.json();
+      await refreshData();
+      return updated;
+    } else {
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      const idx = localFarmers.findIndex(f => f.id === id);
+      if (idx === -1) throw new Error('Farmer not found');
+      const cows = data.cowCount !== undefined ? Number(data.cowCount) : localFarmers[idx].cowCount;
+      const buffalos = data.buffaloCount !== undefined ? Number(data.buffaloCount) : localFarmers[idx].buffaloCount;
+      
+      localFarmers[idx] = {
+        ...localFarmers[idx],
+        ...data,
+        cowCount: cows,
+        buffaloCount: buffalos,
+        totalAnimals: cows + buffalos
+      };
+      localStorage.setItem('farmers', JSON.stringify(localFarmers));
+
+      logAudit(creator.name, 'UPDATE_FARMER', `Updated farmer profile ${localFarmers[idx].name}`);
+      loadLocalStorage();
+      return localFarmers[idx];
+    }
+  };
+
+  const addRoute = async (data: Partial<Route>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/routes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to add route');
+      const newRoute = await res.json();
+      await refreshData();
+      return newRoute;
+    } else {
+      const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]') as Route[];
+      const nextId = localRoutes.reduce((max: number, r: any) => r.id > max ? r.id : max, 0) + 1;
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const emp = localUsers.find(u => u.id === Number(data.assignedEmployeeId));
+      
+      const newRoute: Route = {
+        id: nextId,
+        name: data.name || '',
+        description: data.description,
+        village: data.village || '',
+        managerId: creator.id || 2,
+        assignedEmployeeId: data.assignedEmployeeId ? Number(data.assignedEmployeeId) : null,
+        assignedEmployeeName: emp?.name
+      };
+      localRoutes.push(newRoute);
+      localStorage.setItem('routes', JSON.stringify(localRoutes));
+
+      logAudit(creator.name, 'CREATE_ROUTE', `Created route ${newRoute.name}`);
+      loadLocalStorage();
+      return newRoute;
+    }
+  };
+
+  const updateRoute = async (id: number, data: Partial<Route>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/routes/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update route');
+      const updated = await res.json();
+      await refreshData();
+      return updated;
+    } else {
+      const localRoutes = JSON.parse(localStorage.getItem('routes') || '[]') as Route[];
+      const idx = localRoutes.findIndex(r => r.id === id);
+      if (idx === -1) throw new Error('Route not found');
+      
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const emp = localUsers.find(u => u.id === Number(data.assignedEmployeeId));
+
+      localRoutes[idx] = {
+        ...localRoutes[idx],
+        ...data,
+        assignedEmployeeId: data.assignedEmployeeId !== undefined ? (data.assignedEmployeeId ? Number(data.assignedEmployeeId) : null) : localRoutes[idx].assignedEmployeeId,
+        assignedEmployeeName: data.assignedEmployeeId !== undefined ? (emp?.name || undefined) : localRoutes[idx].assignedEmployeeName
+      };
+      localStorage.setItem('routes', JSON.stringify(localRoutes));
+
+      logAudit(creator.name, 'UPDATE_ROUTE', `Updated route mapping for ${localRoutes[idx].name}`);
+      loadLocalStorage();
+      return localRoutes[idx];
+    }
+  };
+
+  const deleteRoute = async (id: number) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/routes/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        }
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete route');
+      await refreshData();
+    } else {
+      let localRoutes = JSON.parse(localStorage.getItem('routes') || '[]') as Route[];
+      const r = localRoutes.find(route => route.id === id);
+      localRoutes = localRoutes.filter(route => route.id !== id);
+      localStorage.setItem('routes', JSON.stringify(localRoutes));
+
+      logAudit(creator.name, 'DELETE_ROUTE', `Deleted route ${r?.name || id}`);
+      loadLocalStorage();
+    }
+  };
+
+  const assignVisit = async (data: Partial<Visit>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/visits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to assign visit');
+      const newVisit = await res.json();
+      await refreshData();
+      return newVisit;
+    } else {
+      const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      
+      const emp = localUsers.find(u => u.id === Number(data.employeeId));
+      const farmer = localFarmers.find(f => f.id === data.farmerId);
+
+      const nextId = localVisits.reduce((max: number, v: any) => v.id > max ? v.id : max, 0) + 1;
+      const newVisit: Visit = {
+        id: nextId,
+        date: data.date || '',
+        time: data.time || '',
+        employeeId: Number(data.employeeId),
+        employeeName: emp?.name || 'Agent',
+        managerId: creator.id || 2,
+        farmerId: data.farmerId || '',
+        farmerName: farmer?.name || 'Farmer',
+        village: farmer?.village || '',
+        remarks: data.remarks,
+        status: 'PENDING'
+      };
+
+      localVisits.push(newVisit);
+      localStorage.setItem('visits', JSON.stringify(localVisits));
+
+      logAudit(creator.name, 'ASSIGN_VISIT', `Assigned farmer visit to ${newVisit.employeeName} for ${newVisit.farmerName}`);
+      loadLocalStorage();
+      return newVisit;
+    }
+  };
+
+  const updateVisit = async (id: number, data: Partial<Visit>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/visits/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update visit');
+      const updated = await res.json();
+      await refreshData();
+      return updated;
+    } else {
+      const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
+      const idx = localVisits.findIndex(v => v.id === id);
+      if (idx === -1) throw new Error('Visit not found');
+      
+      localVisits[idx] = { ...localVisits[idx], ...data };
+      localStorage.setItem('visits', JSON.stringify(localVisits));
+
+      logAudit(creator.name, 'UPDATE_VISIT', `Updated visit status to ${localVisits[idx].status} for ${localVisits[idx].farmerName}`);
+      loadLocalStorage();
+      return localVisits[idx];
+    }
+  };
+
+  const recordMilk = async (data: Partial<MilkCollection>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/collections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to record milk');
+      const newCollection = await res.json();
+      await refreshData();
+      return newCollection;
+    } else {
+      const localCollections = JSON.parse(localStorage.getItem('collections') || '[]') as MilkCollection[];
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      
+      const farmer = localFarmers.find(f => f.id === data.farmerId);
+      const fat = Number(data.fatPercent) || 0;
+      const snf = Number(data.snfPercent) || 0;
+      const qty = Number(data.quantityLitres) || 0;
+      const rate = calculateMockRate(fat, snf);
+      const amount = Math.round((qty * rate) * 100) / 100;
+
+      const nextId = localCollections.reduce((max: number, c: any) => c.id > max ? c.id : max, 0) + 1;
+      const newCollection: MilkCollection = {
+        id: nextId,
+        visitId: data.visitId ? Number(data.visitId) : null,
+        date: data.date || new Date().toISOString().split('T')[0],
+        timeOfDay: data.timeOfDay || 'MORNING',
+        quantityLitres: qty,
+        fatPercent: fat,
+        snfPercent: snf,
+        clr: data.clr ? Number(data.clr) : null,
+        ratePerLitre: rate,
+        totalAmount: amount,
+        collectedById: creator.id || 4,
+        collectedByName: creator.name || 'Field Agent',
+        farmerId: data.farmerId || '',
+        farmerName: farmer?.name,
+        village: farmer?.village,
+        paymentStatus: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+
+      localCollections.push(newCollection);
+      localStorage.setItem('collections', JSON.stringify(localCollections));
+
+      // Mark associated visit as COMPLETED
+      if (data.visitId) {
+        const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
+        const vIdx = localVisits.findIndex(v => v.id === Number(data.visitId));
+        if (vIdx !== -1) {
+          localVisits[vIdx].status = 'COMPLETED';
+          localStorage.setItem('visits', JSON.stringify(localVisits));
+        }
+      }
+
+      logAudit(creator.name, 'RECORD_MILK', `Recorded ${qty}L milk for ${farmer?.name}`);
+      loadLocalStorage();
+      return newCollection;
+    }
+  };
+
+  const processPayment = async (farmerId: string, txnRef?: string) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify({ farmerId, transactionRef: txnRef })
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to process payment');
+      const newPayment = await res.json();
+      await refreshData();
+      return newPayment;
+    } else {
+      const localCollections = JSON.parse(localStorage.getItem('collections') || '[]') as MilkCollection[];
+      const localPayments = JSON.parse(localStorage.getItem('payments') || '[]') as Payment[];
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      
+      const farmer = localFarmers.find(f => f.id === farmerId);
+      const pendingCols = localCollections.filter(c => c.farmerId === farmerId && c.paymentStatus === 'PENDING');
+      
+      if (pendingCols.length === 0) throw new Error('No pending collections to pay');
+      const totalAmount = pendingCols.reduce((sum, col) => sum + col.totalAmount, 0);
+      const roundedAmount = Math.round(totalAmount * 100) / 100;
+
+      const nextId = localPayments.reduce((max: number, p: any) => p.id > max ? p.id : max, 0) + 1;
+      const payment: Payment = {
+        id: nextId,
+        farmerId,
+        farmerName: farmer?.name,
+        village: farmer?.village,
+        amount: roundedAmount,
+        paymentDate: new Date().toISOString().split('T')[0],
+        status: 'COMPLETED',
+        transactionRef: txnRef || `TXN-${Date.now()}`,
+        processedById: creator.id || 1
+      };
+
+      localPayments.push(payment);
+      localStorage.setItem('payments', JSON.stringify(localPayments));
+
+      // Update collections to PAID
+      pendingCols.forEach(col => {
+        const idx = localCollections.findIndex(c => c.id === col.id);
+        if (idx !== -1) {
+          localCollections[idx].paymentStatus = 'PAID';
+          localCollections[idx].paymentId = payment.id;
+        }
+      });
+      localStorage.setItem('collections', JSON.stringify(localCollections));
+
+      logAudit(creator.name, 'PROCESS_PAYMENT', `Paid ₹${roundedAmount} to Farmer ${farmer?.name}`);
+      loadLocalStorage();
+      return payment;
+    }
+  };
+
+  const clockIn = async (userId: number) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/attendance/clock-in', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        }
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to clock in');
+      const record = await res.json();
+      await refreshData();
+      return record;
+    } else {
+      const localAttendance = JSON.parse(localStorage.getItem('attendance') || '[]') as Attendance[];
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const emp = localUsers.find(u => u.id === userId);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5);
+
+      const exists = localAttendance.find(a => a.userId === userId && a.date === todayStr);
+      if (exists) throw new Error('Already clocked in today');
+
+      const nextId = localAttendance.reduce((max: number, a: any) => a.id > max ? a.id : max, 0) + 1;
+      const record: Attendance = {
+        id: nextId,
+        userId,
+        userName: emp?.name,
+        date: todayStr,
+        status: 'PRESENT',
+        clockIn: timeNow
+      };
+      localAttendance.push(record);
+      localStorage.setItem('attendance', JSON.stringify(localAttendance));
+
+      logAudit(emp?.name || 'Agent', 'CLOCK_IN', `Clocked in at ${timeNow}`);
+      loadLocalStorage();
+      return record;
+    }
+  };
+
+  const clockOut = async (userId: number) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/attendance/clock-out', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        }
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to clock out');
+      const record = await res.json();
+      await refreshData();
+      return record;
+    } else {
+      const localAttendance = JSON.parse(localStorage.getItem('attendance') || '[]') as Attendance[];
+      const todayStr = new Date().toISOString().split('T')[0];
+      const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5);
+
+      const idx = localAttendance.findIndex(a => a.userId === userId && a.date === todayStr);
+      if (idx === -1) throw new Error('No clock in record found today');
+      if (localAttendance[idx].clockOut) throw new Error('Already clocked out today');
+
+      localAttendance[idx].clockOut = timeNow;
+      localStorage.setItem('attendance', JSON.stringify(localAttendance));
+
+      logAudit(localAttendance[idx].userName || 'Agent', 'CLOCK_OUT', `Clocked out at ${timeNow}`);
+      loadLocalStorage();
+      return localAttendance[idx];
+    }
+  };
+
+  const applyLeave = async (userId: number, startDate: string, endDate: string, reason: string) => {
+    if (isApiMode) {
+      const res = await fetch('/api/leaves', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify({ startDate, endDate, reason })
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to apply leave');
+      const leave = await res.json();
+      await refreshData();
+      return leave;
+    } else {
+      const localLeaves = JSON.parse(localStorage.getItem('leaves') || '[]') as Leave[];
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const emp = localUsers.find(u => u.id === userId);
+
+      const nextId = localLeaves.reduce((max: number, l: any) => l.id > max ? l.id : max, 0) + 1;
+      const leave: Leave = {
+        id: nextId,
+        userId,
+        userName: emp?.name || 'Agent',
+        startDate,
+        endDate,
+        reason,
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+      localLeaves.push(leave);
+      localStorage.setItem('leaves', JSON.stringify(localLeaves));
+
+      logAudit(emp?.name || 'Agent', 'LEAVE_APPLY', `Applied for leave from ${startDate} to ${endDate}`);
+      loadLocalStorage();
+      return leave;
+    }
+  };
+
+  const approveRejectLeave = async (leaveId: number, status: 'APPROVED' | 'REJECTED', approverId: number) => {
+    const approver = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/leaves/${leaveId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update leave');
+      const updated = await res.json();
+      await refreshData();
+      return updated;
+    } else {
+      const localLeaves = JSON.parse(localStorage.getItem('leaves') || '[]') as Leave[];
+      const idx = localLeaves.findIndex(l => l.id === leaveId);
+      if (idx === -1) throw new Error('Leave request not found');
+
+      localLeaves[idx].status = status;
+      localLeaves[idx].approvedById = approverId;
+      localLeaves[idx].approvedByName = approver.name;
+      localStorage.setItem('leaves', JSON.stringify(localLeaves));
+
+      // Seed leave markers in attendance if approved
+      if (status === 'APPROVED') {
+        const localAttendance = JSON.parse(localStorage.getItem('attendance') || '[]') as Attendance[];
+        const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+        const emp = localUsers.find(u => u.id === localLeaves[idx].userId);
+
+        const start = new Date(localLeaves[idx].startDate);
+        const end = new Date(localLeaves[idx].endDate);
+        const loop = new Date(start);
+
+        let attId = localAttendance.reduce((max: number, a: any) => a.id > max ? a.id : max, 0) + 1;
+        while (loop <= end) {
+          const dateStr = loop.toISOString().split('T')[0];
+          const exists = localAttendance.find(a => a.userId === localLeaves[idx].userId && a.date === dateStr);
+          if (!exists) {
+            localAttendance.push({
+              id: attId++,
+              userId: localLeaves[idx].userId,
+              userName: emp?.name,
+              date: dateStr,
+              status: 'LEAVE'
+            });
+          }
+          loop.setDate(loop.getDate() + 1);
+        }
+        localStorage.setItem('attendance', JSON.stringify(localAttendance));
+      }
+
+      logAudit(approver.name, `LEAVE_${status}`, `Leave request for employee ID ${localLeaves[idx].userId} was ${status}`);
+      loadLocalStorage();
+      return localLeaves[idx];
+    }
+  };
+
+  // Helper to log audit events locally
+  const logAudit = (name: string, action: string, details: string) => {
+    const localLogs = JSON.parse(localStorage.getItem('auditLogs') || '[]') as AuditLog[];
+    const nextId = localLogs.reduce((max: number, l: any) => l.id > max ? l.id : max, 0) + 1;
+    localLogs.unshift({
+      id: nextId,
+      userName: name,
+      action,
+      details,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('auditLogs', JSON.stringify(localLogs));
+  };
+
+  return (
+    <DatabaseContext.Provider value={{
+      isApiMode,
+      setApiMode,
+      users,
+      farmers,
+      routes,
+      visits,
+      collections,
+      payments,
+      attendance,
+      leaves,
+      auditLogs,
+      refreshData,
+      addUser,
+      updateUser,
+      addFarmer,
+      updateFarmer,
+      addRoute,
+      updateRoute,
+      deleteRoute,
+      assignVisit,
+      updateVisit,
+      recordMilk,
+      processPayment,
+      clockIn,
+      clockOut,
+      applyLeave,
+      approveRejectLeave
+    }}>
+      {children}
+    </DatabaseContext.Provider>
+  );
+};
+
+export const useDatabase = () => {
+  const context = useContext(DatabaseContext);
+  if (!context) throw new Error('useDatabase must be used within a DatabaseProvider');
+  return context;
+};
