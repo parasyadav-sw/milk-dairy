@@ -12,7 +12,12 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
       todayMilk,
       totalPayments,
       pendingCollections,
-      allAuditLogs
+      allAuditLogs,
+      totalSurveysCompleted,
+      totalAnimalsAgg,
+      employeesCurrentlyOnSurvey,
+      todayAttendance,
+      recentSurveys
     ] = await Promise.all([
       prisma.user.count({ where: { role: 'EMPLOYEE' } }),
       prisma.farmer.count(),
@@ -31,6 +36,21 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
         take: 10,
         orderBy: { timestamp: 'desc' },
         include: { user: { select: { name: true, role: true } } }
+      }),
+      prisma.survey.count(),
+      prisma.survey.aggregate({
+        _sum: { totalAnimals: true }
+      }),
+      prisma.attendance.count({
+        where: { date: todayStr, status: 'PRESENT', clockOut: null }
+      }),
+      prisma.attendance.count({
+        where: { date: todayStr, status: 'PRESENT' }
+      }),
+      prisma.survey.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: { employee: { select: { name: true } } }
       })
     ]);
 
@@ -99,14 +119,22 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
         totalFarmers,
         todayMilk: Math.round((todayMilk._sum.quantityLitres || 0) * 100) / 100,
         totalRevenue: Math.round((totalPayments._sum.amount || 0) * 100) / 100,
-        pendingPayments: Math.round((pendingCollections._sum.totalAmount || 0) * 100) / 100
+        pendingPayments: Math.round((pendingCollections._sum.totalAmount || 0) * 100) / 100,
+        totalSurveysCompleted,
+        totalAnimalsSurveyed: totalAnimalsAgg._sum.totalAnimals || 0,
+        employeesCurrentlyOnSurvey,
+        todayAttendance
       },
       charts: {
         dailyTrends,
         villageWise,
         employeePerformance
       },
-      auditLogs: allAuditLogs
+      auditLogs: allAuditLogs,
+      recentSurveys: recentSurveys.map((s: any) => ({
+        ...s,
+        animals: JSON.parse(s.animals)
+      }))
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

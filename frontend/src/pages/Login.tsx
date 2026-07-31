@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDatabase } from '../context/DatabaseContext';
-import { Milk, Lock, Mail, Database, UserCheck, AlertTriangle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Milk, Lock, User, Database, UserCheck, AlertTriangle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, error, clearError } = useAuth();
   const { isApiMode, setApiMode } = useDatabase();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localErr, setLocalErr] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export const Login: React.FC = () => {
     setLocalErr(null);
     clearError();
     try {
-      await login(email, password);
+      await login(username, password);
       navigate('/');
     } catch (err: any) {
       setLocalErr(err.message || 'Login failed.');
@@ -30,8 +30,8 @@ export const Login: React.FC = () => {
     }
   };
 
-  const fillCredentials = (roleEmail: string, rolePw: string) => {
-    setEmail(roleEmail);
+  const fillCredentials = (roleName: string, rolePw: string) => {
+    setUsername(roleName);
     setPassword(rolePw);
   };
 
@@ -76,12 +76,12 @@ export const Login: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <label className="label">Email address</label>
+                <label className="label">Username</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
-                    <Mail className="w-[18px] h-[18px]" />
+                    <User className="w-[18px] h-[18px]" />
                   </span>
-                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@dairy.com" className="input pl-11" />
+                  <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter your username" className="input pl-11" />
                 </div>
               </div>
 
@@ -113,10 +113,9 @@ export const Login: React.FC = () => {
               <span className="label text-muted flex items-center gap-1.5 justify-center mb-3">
                 <UserCheck className="w-3 h-3 text-gold-500" /> Quick access (demo)
               </span>
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => fillCredentials('admin@dairy.com', 'admin123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Admin</button>
-                <button type="button" onClick={() => fillCredentials('manager1@dairy.com', 'manager123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Manager</button>
-                <button type="button" onClick={() => fillCredentials('employee1@dairy.com', 'employee123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Employee</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => fillCredentials('Ramesh', 'admin123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Admin</button>
+                <button type="button" onClick={() => fillCredentials('Amit', 'employee123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Employee</button>
               </div>
             </div>
           )}

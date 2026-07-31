@@ -99,8 +99,6 @@ export const Reports: React.FC = () => {
               <th className="table-header th">Date</th>
               <th className="table-header th text-center">Shift</th>
               <th className="table-header th text-center">Litres</th>
-              <th className="table-header th text-right">Amount</th>
-              <th className="table-header th text-center">Status</th>
             </tr></thead>
             <tbody>{filteredData.slice(0, 15).map(c => (
               <tr key={c.id} className="table-row">
@@ -109,8 +107,6 @@ export const Reports: React.FC = () => {
                 <td className="table-cell text-body-sm text-muted">{c.date}</td>
                 <td className="table-cell text-center text-body-sm">{c.timeOfDay}</td>
                 <td className="table-cell text-center font-mono text-body-sm">{c.quantityLitres} L</td>
-                <td className="table-cell text-right font-mono text-body-sm text-forest-700 font-medium">₹{c.totalAmount.toLocaleString()}</td>
-                <td className="table-cell text-center"><span className={`badge ${c.paymentStatus === 'PAID' ? 'badge-success' : 'badge-warning'}`}>{c.paymentStatus}</span></td>
               </tr>
             ))}</tbody>
           </table>

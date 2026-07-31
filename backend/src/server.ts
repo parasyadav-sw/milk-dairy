@@ -7,9 +7,10 @@ import multer from 'multer';
 
 import { authenticateJWT, requireRole } from './middleware/auth';
 import { login, getProfile, seedInitialAdmin } from './controllers/authController';
-import { createUser, getUsers, updateUser } from './controllers/userController';
+import { createUser, getUsers, updateUser, deleteUser } from './controllers/userController';
 import { createRoute, getRoutes, updateRoute, deleteRoute } from './controllers/routeController';
-import { registerFarmer, getFarmers, getFarmerById, updateFarmer } from './controllers/farmerController';
+import { registerFarmer, getFarmers, getFarmerById, updateFarmer, deleteFarmer } from './controllers/farmerController';
+import { createSurvey, getSurveys } from './controllers/surveyController';
 
 import { recordCollection, getCollections } from './controllers/milkController';
 import { getPendingPayments, processPayment, getPaymentHistory } from './controllers/paymentController';
@@ -64,6 +65,7 @@ app.post('/api/upload', authenticateJWT, upload.single('photo'), (req, res) => {
 app.post('/api/users', authenticateJWT, requireRole(['ADMIN']), createUser);
 app.get('/api/users', authenticateJWT, requireRole(['ADMIN']), getUsers);
 app.put('/api/users/:id', authenticateJWT, requireRole(['ADMIN']), updateUser);
+app.delete('/api/users/:id', authenticateJWT, requireRole(['ADMIN']), deleteUser);
 
 // Routes
 app.post('/api/routes', authenticateJWT, requireRole(['ADMIN']), createRoute);
@@ -76,6 +78,11 @@ app.post('/api/farmers', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), re
 app.get('/api/farmers', authenticateJWT, getFarmers);
 app.get('/api/farmers/:id', authenticateJWT, getFarmerById);
 app.put('/api/farmers/:id', authenticateJWT, updateFarmer);
+app.delete('/api/farmers/:id', authenticateJWT, requireRole(['ADMIN', 'EMPLOYEE']), deleteFarmer);
+
+// Surveys
+app.post('/api/surveys', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), createSurvey);
+app.get('/api/surveys', authenticateJWT, getSurveys);
 
 
 

@@ -29,7 +29,8 @@ export const seedInitialAdmin = async () => {
 };
 
 export const login = async (req: AuthRequest, res: Response) => {
-  const { email, password } = req.body;
+  const email = req.body.email || req.body.username;
+  const { password } = req.body;
 
   try {
     if (!email || !password) {

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
 import { 
-  UserPlus, Search, Shield, Edit2, X, Trash2,
+  UserPlus, Search, Shield, Edit2, X, Trash2, User,
   Users, Phone, Mail, Briefcase, CheckCircle2, XCircle, ShieldAlert 
 } from 'lucide-react';
 import { Toast } from '../components/Toast';
@@ -18,6 +18,7 @@ export const Employees: React.FC = () => {
   const [deletingEmployee, setDeletingEmployee] = useState<any>(null);
 
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE'>('EMPLOYEE');
@@ -31,7 +32,7 @@ export const Employees: React.FC = () => {
   };
 
   const resetForm = () => {
-    setName(''); setEmail(''); setPassword('');
+    setName(''); setUsername(''); setEmail(''); setPassword('');
     setRole('EMPLOYEE'); setStatus('ACTIVE'); setMobile('');
   };
 
@@ -44,7 +45,7 @@ export const Employees: React.FC = () => {
   const handleOpenEdit = (emp: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingEmployee(emp);
-    setName(emp.name); setEmail(emp.email); setPassword('');
+    setName(emp.name); setUsername(emp.username || ''); setEmail(emp.email); setPassword('');
     setRole(emp.role); setStatus(emp.status);
     setMobile((emp as any).mobile || '');
     setShowModal(true);
@@ -64,8 +65,8 @@ export const Employees: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      triggerToast('Name and email are required', 'error');
+    if (!name.trim() || !username.trim() || !email.trim()) {
+      triggerToast('Name, username and email are required', 'error');
       return;
     }
     if (!editingEmployee && !password.trim()) {
@@ -74,13 +75,13 @@ export const Employees: React.FC = () => {
     }
     try {
       if (editingEmployee) {
-        const updateData: any = { name, email, role, status };
+        const updateData: any = { name, username, email, role, status };
         if (mobile) updateData.mobile = mobile;
         if (password) updateData.password = password;
         await updateUser(editingEmployee.id, updateData);
         triggerToast('Employee updated successfully');
       } else {
-        const userData: any = { name, email, password, role, status, managerId: user?.id };
+        const userData: any = { name, username, email, password, role, status, managerId: user?.id };
         if (mobile) userData.mobile = mobile;
         await addUser(userData);
         triggerToast('Employee added successfully');
@@ -200,6 +201,9 @@ export const Employees: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-body-sm text-muted">
                     <span className="flex items-center gap-1">
+                      <User className="w-3 h-3" /> {emp.username}
+                    </span>
+                    <span className="flex items-center gap-1">
                       <Mail className="w-3 h-3" /> {emp.email}
                     </span>
                   </div>
@@ -247,6 +251,10 @@ export const Employees: React.FC = () => {
                 <div>
                   <label className="label">Full name *</label>
                   <input type="text" value={name} onChange={e => setName(e.target.value)} className="input" placeholder="e.g. Amit Patel" required />
+                </div>
+                <div>
+                  <label className="label">Username *</label>
+                  <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="input" placeholder="e.g. amit123" required />
                 </div>
                 <div>
                   <label className="label">Email address *</label>
@@ -306,6 +314,10 @@ export const Employees: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div className="card p-3">
+                  <p className="text-label text-muted mb-1">Username</p>
+                  <p className="text-body font-medium text-foreground">{selectedEmployee.username}</p>
+                </div>
                 <div className="card p-3">
                   <p className="text-label text-muted mb-1">Email</p>
                   <p className="text-body font-medium text-foreground">{selectedEmployee.email}</p>

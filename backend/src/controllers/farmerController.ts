@@ -208,3 +208,37 @@ export const updateFarmer = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const deleteFarmer = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const farmer = await prisma.farmer.findUnique({ where: { id } });
+    if (!farmer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Delete related milk collections and payments first if they exist to prevent foreign key errors
+    await prisma.milkCollection.deleteMany({ where: { farmerId: id } });
+    await prisma.payment.deleteMany({ where: { farmerId: id } });
+
+    await prisma.farmer.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE_FARMER',
+        details: `Deleted customer ${farmer.name} (ID: ${id})`
+      }
+    });
+
+    res.json({ message: 'Customer deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

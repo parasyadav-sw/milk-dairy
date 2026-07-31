@@ -7,17 +7,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
-  ADMIN
-  EMPLOYEE
-}
-
 model User {
   id               Int              @id @default(autoincrement())
   email            String           @unique
   password         String
   name             String
-  role             Role
+  role             String
   status           String           @default("ACTIVE")
   
   routesCreated    Route[]          @relation("AdminRoutes")
@@ -30,6 +25,7 @@ model User {
   notifications    Notification[]
   auditLogs        AuditLog[]
   registeredFarmers Farmer[]
+  surveysSubmitted Survey[]          @relation("EmployeeSurveys")
   
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -54,6 +50,9 @@ model Farmer {
   totalAnimals    Int              @default(0)
   cowMilkYield    Float            @default(0.0)
   buffaloMilkYield Float           @default(0.0)
+  
+  surveyDate      String?
+  notes           String?
 
   registeredById  Int
   registeredBy    User             @relation(fields: [registeredById], references: [id])
@@ -176,4 +175,22 @@ model AuditLog {
   action    String
   details   String
   timestamp DateTime @default(now())
+}
+
+model Survey {
+  id                  Int      @id @default(autoincrement())
+  customerName        String
+  mobile              String
+  village             String
+  address             String
+  animals             String     // Serialized JSON string of [{type: 'COW'|'BUFFALO', count: number, milkPerAnimal: number}]
+  totalAnimals        Int
+  totalMilkProduction Float
+  interested          Boolean  @default(false)
+  remarks             String?
+  employeeId          Int
+  employee            User     @relation("EmployeeSurveys", fields: [employeeId], references: [id])
+  surveyDate          String   // "YYYY-MM-DD"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // --- DATA TYPES ---
 export interface User {
   id: number;
+  username?: string;
   email: string;
   name: string;
   role: 'ADMIN' | 'EMPLOYEE';
@@ -175,12 +176,12 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!localStorage.getItem('mock_seeded')) {
       const initialUsers: User[] = [
-        { id: 1, email: 'admin@dairy.com', name: 'Ramesh Kumar (Admin)', role: 'ADMIN', status: 'ACTIVE' },
-        { id: 4, email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
-        { id: 5, email: 'employee2@dairy.com', name: 'Rahul Verma (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
-        { id: 6, email: 'employee3@dairy.com', name: 'Deepak Rao (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
-        { id: 7, email: 'employee4@dairy.com', name: 'Suresh Kumar (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
-        { id: 8, email: 'employee5@dairy.com', name: 'Vikram Singh (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' }
+        { id: 1, username: 'Ramesh', email: 'admin@dairy.com', name: 'Ramesh Kumar (Admin)', role: 'ADMIN', status: 'ACTIVE' },
+        { id: 4, username: 'Amit', email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 5, username: 'Rahul', email: 'employee2@dairy.com', name: 'Rahul Verma (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 6, username: 'Deepak', email: 'employee3@dairy.com', name: 'Deepak Rao (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 7, username: 'Suresh', email: 'employee4@dairy.com', name: 'Suresh Kumar (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 8, username: 'Vikram', email: 'employee5@dairy.com', name: 'Vikram Singh (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' }
       ];
 
       const initialFarmers: Farmer[] = [
@@ -550,6 +551,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const nextId = localUsers.reduce((max: number, u: any) => u.id > max ? u.id : max, 0) + 1;
       const newUser: User = {
         id: nextId,
+        username: data.username || '',
         email: data.email || '',
         name: data.name || '',
         role: data.role || 'EMPLOYEE',

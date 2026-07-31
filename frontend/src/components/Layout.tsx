@@ -22,16 +22,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleRoleSimulation = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const roleEmail = e.target.value;
-    if (roleEmail) {
+    const roleName = e.target.value;
+    if (roleName) {
       logout();
       setTimeout(async () => {
         try {
           const defaultPasswords: { [key: string]: string } = {
-            'admin@dairy.com': 'admin123',
-            'employee1@dairy.com': 'employee123'
+            'Ramesh': 'admin123',
+            'Amit': 'employee123'
           };
-          await login(roleEmail, defaultPasswords[roleEmail] || 'password');
+          await login(roleName, defaultPasswords[roleName] || 'password');
           navigate('/');
         } catch (err) {
           console.error('Role simulator failed:', err);
@@ -113,12 +113,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <UserCheck className="w-3 h-3" /> Demo mode
             </label>
             <select
-              value={user?.email || ''}
+              value={user?.username || ''}
               onChange={handleRoleSimulation}
               className="w-full bg-white border border-warm-200 rounded-lg text-body-sm font-medium px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
             >
-              <option value="admin@dairy.com">Admin: Ramesh</option>
-              <option value="employee1@dairy.com">Employee: Amit</option>
+              <option value="Ramesh">Admin: Ramesh</option>
+              <option value="Amit">Employee: Amit</option>
             </select>
           </div>
         )}

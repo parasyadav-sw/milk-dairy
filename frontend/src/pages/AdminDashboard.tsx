@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Users, UserCheck, Milk, Landmark, 
   Calendar, CheckCircle, Plus, Edit, ToggleLeft, ToggleRight, 
-  History, Shield, Coins
+  History, Shield, Coins, ClipboardList
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 
 export const AdminDashboard: React.FC = () => {
-  const { users, farmers, collections, payments, auditLogs, addUser, updateUser } = useDatabase();
+  const { users, farmers, collections, payments, auditLogs, surveys, attendance, addUser, updateUser } = useDatabase();
   const { user: currentAdmin } = useAuth();
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -24,10 +24,11 @@ export const AdminDashboard: React.FC = () => {
 
   const employeesCount = users.filter(u => u.role === 'EMPLOYEE').length;
   const farmersCount = farmers.length;
+  const surveysCount = surveys.length;
+  const totalAnimalsSurveyed = surveys.reduce((sum, s) => sum + s.totalAnimals, 0);
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayMilkQuantity = collections.filter(c => c.date === todayStr).reduce((sum, col) => sum + col.quantityLitres, 0);
-  const totalPaidRevenue = payments.reduce((sum, pay) => sum + pay.amount, 0);
-  const pendingPayoutAmount = collections.filter(c => c.paymentStatus === 'PENDING').reduce((sum, col) => sum + col.totalAmount, 0);
+  const employeesCurrentlyOnSurvey = attendance.filter(a => a.date === todayStr && a.status === 'PRESENT' && !a.clockOut).length;
+  const todayAttendance = attendance.filter(a => a.date === todayStr && a.status === 'PRESENT').length;
 
   const last7Days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0]; }).reverse();
   const dailyTrendData = last7Days.map(date => {
@@ -57,12 +58,12 @@ export const AdminDashboard: React.FC = () => {
   const handleToggleStatus = async (targetUser: any) => { try { await updateUser(targetUser.id, { status: targetUser.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }); } catch (err: any) { alert('Failed: ' + err.message); } };
 
   const stats = [
-    { label: 'Field agents', value: employeesCount, icon: <Users className="w-5 h-5" />, bg: 'bg-warm-100', fg: 'text-warm-700' },
-    { label: 'Customers', value: farmersCount, icon: <UserCheck className="w-5 h-5" />, bg: 'bg-gold-50', fg: 'text-gold-600' },
-    { label: "Today's milk", value: `${todayMilkQuantity.toFixed(1)} L`, icon: <Milk className="w-5 h-5" />, bg: 'bg-primary-50', fg: 'text-primary-700' },
-    { label: 'Total payouts', value: `₹${totalPaidRevenue.toLocaleString()}`, icon: <Landmark className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
-    { label: 'Pending due', value: `₹${pendingPayoutAmount.toLocaleString()}`, icon: <Coins className="w-5 h-5" />, bg: 'bg-red-50', fg: 'text-error' },
-    { label: 'System', value: 'Online', icon: <CheckCircle className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
+    { label: 'Total Employees', value: employeesCount, icon: <Users className="w-5 h-5" />, bg: 'bg-warm-100', fg: 'text-warm-700' },
+    { label: 'Total Customers (Farmers)', value: farmersCount, icon: <UserCheck className="w-5 h-5" />, bg: 'bg-gold-50', fg: 'text-gold-600' },
+    { label: 'Total Surveys Completed', value: surveysCount, icon: <ClipboardList className="w-5 h-5" />, bg: 'bg-primary-50', fg: 'text-primary-700' },
+    { label: 'Total Animals Surveyed', value: totalAnimalsSurveyed, icon: <Milk className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
+    { label: 'Employees on Survey', value: employeesCurrentlyOnSurvey, icon: <Shield className="w-5 h-5" />, bg: 'bg-red-50', fg: 'text-error' },
+    { label: "Today's Attendance", value: todayAttendance, icon: <CheckCircle className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
   ];
 
   return (
@@ -143,17 +144,52 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="card p-6 space-y-4">
-        <div className="flex items-center gap-2 pb-3 border-b border-warm-100"><History className="w-4 h-4 text-muted" /><h3 className="section-title">Audit logs</h3></div>
-        <div className="max-h-[250px] overflow-y-auto space-y-2">{auditLogs.map(log => (
-          <div key={log.id} className="flex items-start justify-between p-3 bg-warm-50 rounded-xl text-body-sm border border-warm-100">
-            <div className="space-y-1">
-              <span className="text-foreground font-medium block">{log.details}</span>
-              <span className="label text-muted">By {log.userName || 'System'} • {log.action}</span>
-            </div>
-            <span className="label text-muted shrink-0 pl-4">{new Date(log.timestamp).toLocaleTimeString()}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Recent Survey Activity */}
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-warm-100">
+            <ClipboardList className="w-4 h-4 text-muted" />
+            <h3 className="section-title">Recent survey activity</h3>
           </div>
-        ))}</div>
+          <div className="max-h-[250px] overflow-y-auto space-y-2">
+            {surveys.slice(0, 10).map(s => {
+              const empName = s.employeeName || users.find(u => u.id === s.employeeId)?.name || `Agent #${s.employeeId}`;
+              return (
+                <div key={s.id} className="flex items-start justify-between p-3 bg-warm-50 rounded-xl text-body-sm border border-warm-100">
+                  <div className="space-y-1">
+                    <span className="text-foreground font-medium block">
+                      Surveyed <strong>{s.customerName}</strong> ({s.totalAnimals} animals, {s.totalMilkProduction.toFixed(1)} L/day)
+                    </span>
+                    <span className="label text-muted">By {empName.split('(')[0].trim()} • {s.surveyDate}</span>
+                  </div>
+                  {s.interested && <span className="badge badge-success text-[10px] scale-90 shrink-0">Interested</span>}
+                </div>
+              );
+            })}
+            {surveys.length === 0 && (
+              <p className="text-muted text-body-sm text-center py-8">No recent survey activity</p>
+            )}
+          </div>
+        </div>
+
+        {/* Audit Logs */}
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-warm-100">
+            <History className="w-4 h-4 text-muted" />
+            <h3 className="section-title">Audit logs</h3>
+          </div>
+          <div className="max-h-[250px] overflow-y-auto space-y-2">
+            {auditLogs.map(log => (
+              <div key={log.id} className="flex items-start justify-between p-3 bg-warm-50 rounded-xl text-body-sm border border-warm-100">
+                <div className="space-y-1">
+                  <span className="text-foreground font-medium block">{log.details}</span>
+                  <span className="label text-muted">By {log.userName || 'System'} • {log.action}</span>
+                </div>
+                <span className="label text-muted shrink-0 pl-4">{new Date(log.timestamp).toLocaleTimeString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {showUserModal && (

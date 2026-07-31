@@ -153,3 +153,41 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const requesterRole = req.user?.role;
+    const requesterId = req.user?.id;
+    const targetUserId = parseInt(id);
+
+    if (!requesterRole || !requesterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (requesterRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Access denied: Only Admins can delete users' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.user.delete({ where: { id: targetUserId } });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        userId: requesterId,
+        action: 'DELETE_USER',
+        details: `Deleted user ${targetUser.name} (ID: ${targetUser.id})`
+      }
+    });
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

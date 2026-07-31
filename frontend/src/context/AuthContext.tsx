@@ -4,7 +4,7 @@ import { useDatabase, User } from './DatabaseContext';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   error: string | null;
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ username, password })
         });
         
         if (!res.ok) {
@@ -53,10 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('dairy_user', JSON.stringify(data.user));
         localStorage.setItem('dairy_token', data.token);
       } else {
-        // Mock authentication check
-        // Check if user exists in the local database
         const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as any[];
-        const found = localUsers.find(u => u.email === email);
+        const found = localUsers.find(u => u.username && u.username.toLowerCase() === username.toLowerCase());
         
         if (!found) {
           throw new Error('User not found');
@@ -66,8 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error('This account has been deactivated');
         }
 
-        // Mock password matching (simple fallback checks)
-        // Checks standard mock password patterns
         const correctPassword = 
           found.role === 'ADMIN' ? 'admin123' : 'employee123';
         
@@ -77,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const mockUser: User = {
           id: found.id,
+          username: found.username,
           email: found.email,
           name: found.name,
           role: found.role,
