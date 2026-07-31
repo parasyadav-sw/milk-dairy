@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft, Milk } from 'lucide-react';
 import { Toast } from '../components/Toast';
 
-export const Farmers: React.FC = () => {
-  const { farmers, addFarmer, updateFarmer } = useDatabase();
+export const Customers: React.FC = () => {
+  const { farmers, addFarmer, updateFarmer, collections } = useDatabase();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [villageFilter, setVillageFilter] = useState('');
@@ -16,18 +16,19 @@ export const Farmers: React.FC = () => {
   const [village, setVillage] = useState(''); const [taluka, setTaluka] = useState(''); const [district, setDistrict] = useState('');
   const [address, setAddress] = useState(''); const [animalType, setAnimalType] = useState('COW');
   const [cowCount, setCowCount] = useState(''); const [buffaloCount, setBuffaloCount] = useState('');
+  const [cowMilkYield, setCowMilkYield] = useState(''); const [buffaloMilkYield, setBuffaloMilkYield] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [selectedFarmer, setSelectedFarmer] = useState<any | null>(null);
   const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); };
 
-  const resetForm = () => { setName(''); setMobile(''); setAltMobile(''); setGender('MALE'); setAge(''); setAadhaar(''); setVillage(''); setTaluka(''); setDistrict(''); setAddress(''); setAnimalType('COW'); setCowCount(''); setBuffaloCount(''); };
+  const resetForm = () => { setName(''); setMobile(''); setAltMobile(''); setGender('MALE'); setAge(''); setAadhaar(''); setVillage(''); setTaluka(''); setDistrict(''); setAddress(''); setAnimalType('COW'); setCowCount(''); setBuffaloCount(''); setCowMilkYield(''); setBuffaloMilkYield(''); };
   const handleOpenAdd = () => { setEditingFarmer(null); resetForm(); setShowModal(true); };
-  const handleOpenEdit = (f: any) => { setEditingFarmer(f); setName(f.name); setMobile(f.mobile); setAltMobile(f.altMobile || ''); setGender(f.gender); setAge(String(f.age)); setAadhaar(f.aadhaar || ''); setVillage(f.village); setTaluka(f.taluka); setDistrict(f.district); setAddress(f.address); setAnimalType(f.animalType); setCowCount(String(f.cowCount)); setBuffaloCount(String(f.buffaloCount)); setShowModal(true); };
+  const handleOpenEdit = (f: any) => { setEditingFarmer(f); setName(f.name); setMobile(f.mobile); setAltMobile(f.altMobile || ''); setGender(f.gender); setAge(String(f.age)); setAadhaar(f.aadhaar || ''); setVillage(f.village); setTaluka(f.taluka); setDistrict(f.district); setAddress(f.address); setAnimalType(f.animalType); setCowCount(String(f.cowCount)); setBuffaloCount(String(f.buffaloCount)); setCowMilkYield(f.cowMilkYield ? String(f.cowMilkYield) : ''); setBuffaloMilkYield(f.buffaloMilkYield ? String(f.buffaloMilkYield) : ''); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !mobile || !age || !village || !taluka || !district || !address) { triggerToast('All required fields must be filled.', 'error'); return; }
-    const payload = { name, mobile, altMobile: altMobile || undefined, gender, age: parseInt(age), aadhaar: aadhaar || undefined, village, taluka, district, address, animalType, cowCount: cowCount ? parseInt(cowCount) : 0, buffaloCount: buffaloCount ? parseInt(buffaloCount) : 0 };
+    const payload = { name, mobile, altMobile: altMobile || undefined, gender, age: parseInt(age), aadhaar: aadhaar || undefined, village, taluka, district, address, animalType, cowCount: cowCount ? parseInt(cowCount) : 0, buffaloCount: buffaloCount ? parseInt(buffaloCount) : 0, cowMilkYield: cowMilkYield ? parseFloat(cowMilkYield) : 0.0, buffaloMilkYield: buffaloMilkYield ? parseFloat(buffaloMilkYield) : 0.0 };
     try {
       if (editingFarmer) { await updateFarmer(editingFarmer.id, payload); triggerToast('Farmer updated!'); }
       else { await addFarmer(payload); triggerToast('Farmer registered!'); }
@@ -43,15 +44,17 @@ export const Farmers: React.FC = () => {
 
   const uniqueVillages = Array.from(new Set(farmers.map(f => f.village)));
 
+  const getMilkTotal = (farmerId: string) => collections.filter(c => c.farmerId === farmerId).reduce((sum, c) => sum + c.quantityLitres, 0);
+
   return (
     <div className="space-y-8">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Farmers</h1>
-          <p className="page-subtitle">Registered dairy milk producers</p>
+          <h1 className="page-title">Customers</h1>
+          <p className="page-subtitle">Registered dairy milk customers</p>
         </div>
-        {user?.role === 'EMPLOYEE' && <button onClick={handleOpenAdd} className="btn-primary"><Plus className="w-4 h-4" /> Register farmer</button>}
+        {user?.role === 'EMPLOYEE' && <button onClick={handleOpenAdd} className="btn-primary"><Plus className="w-4 h-4" /> Register customer</button>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -91,6 +94,11 @@ export const Farmers: React.FC = () => {
                   <span className="label text-muted block">Buffalos</span>
                   <span className="text-data font-display text-primary-700">{f.buffaloCount}</span>
                 </div>
+                <div className="w-px h-8 bg-warm-200" />
+                <div>
+                  <span className="label text-muted block">Milk</span>
+                  <span className="text-data font-display text-forest-700">{getMilkTotal(f.id).toFixed(1)} L</span>
+                </div>
               </div>
             </div>
           ))}
@@ -98,7 +106,7 @@ export const Farmers: React.FC = () => {
       ) : (
         <div className="empty-state card p-12">
           <ShieldAlert className="w-10 h-10 text-warm-300 mb-3" />
-          <p className="font-medium text-warm-700">No farmers found</p>
+          <p className="font-medium text-warm-700">No customers found</p>
           <p className="text-body-sm text-muted mt-1">Try adjusting your search.</p>
         </div>
       )}
@@ -106,7 +114,7 @@ export const Farmers: React.FC = () => {
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3 className="font-display text-display-md text-foreground mb-6">{editingFarmer ? 'Edit farmer' : 'Register farmer'}</h3>
+            <h3 className="font-display text-display-md text-foreground mb-6">{editingFarmer ? 'Edit customer' : 'Register customer'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2"><label className="label">Full name *</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input" /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -128,6 +136,10 @@ export const Farmers: React.FC = () => {
                   <select value={animalType} onChange={(e) => setAnimalType(e.target.value)} className="select"><option value="COW">Cow</option><option value="BUFFALO">Buffalo</option><option value="BOTH">Both</option></select></div>
                 <div className="space-y-2"><label className="label">Cows</label><input type="number" value={cowCount} onChange={(e) => setCowCount(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">Buffalos</label><input type="number" value={buffaloCount} onChange={(e) => setBuffaloCount(e.target.value)} className="input" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><label className="label">Cow Milk Yield (L/animal)</label><input type="number" step="0.1" value={cowMilkYield} onChange={(e) => setCowMilkYield(e.target.value)} className="input" placeholder="e.g. 6.5" /></div>
+                <div className="space-y-2"><label className="label">Buffalo Milk Yield (L/animal)</label><input type="number" step="0.1" value={buffaloMilkYield} onChange={(e) => setBuffaloMilkYield(e.target.value)} className="input" placeholder="e.g. 8.0" /></div>
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t border-warm-100">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-ghost">Cancel</button>
@@ -188,19 +200,21 @@ export const Farmers: React.FC = () => {
               </div>
 
               <div className="border-t border-warm-100 pt-4">
-                <span className="label text-muted block mb-3">Livestock</span>
+                <span className="label text-muted block mb-3">Livestock & Milk Yield</span>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3 bg-primary-50 rounded-xl text-center">
+                  <div className="p-3 bg-primary-50 rounded-xl text-center flex flex-col justify-center">
                     <span className="label text-muted block">Type</span>
-                    <span className="text-body font-medium text-primary-700">{selectedFarmer.animalType}</span>
+                    <span className="text-body font-medium text-primary-700 mt-1">{selectedFarmer.animalType}</span>
                   </div>
                   <div className="p-3 bg-primary-50 rounded-xl text-center">
                     <span className="label text-muted block">Cows</span>
-                    <span className="text-data-lg font-display text-primary-700">{selectedFarmer.cowCount}</span>
+                    <span className="text-data-lg font-display text-primary-700 block my-0.5">{selectedFarmer.cowCount}</span>
+                    {selectedFarmer.cowMilkYield > 0 && <span className="text-body-xs text-primary-600 block mt-1">{selectedFarmer.cowMilkYield} L</span>}
                   </div>
                   <div className="p-3 bg-primary-50 rounded-xl text-center">
                     <span className="label text-muted block">Buffalos</span>
-                    <span className="text-data-lg font-display text-primary-700">{selectedFarmer.buffaloCount}</span>
+                    <span className="text-data-lg font-display text-primary-700 block my-0.5">{selectedFarmer.buffaloCount}</span>
+                    {selectedFarmer.buffaloMilkYield > 0 && <span className="text-body-xs text-primary-600 block mt-1">{selectedFarmer.buffaloMilkYield} L</span>}
                   </div>
                 </div>
               </div>

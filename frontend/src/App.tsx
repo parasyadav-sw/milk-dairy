@@ -5,12 +5,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { DashboardDispatcher } from './pages/DashboardDispatcher';
-import { Farmers } from './pages/Farmers';
-import { Visits } from './pages/Visits';
-import { Collections } from './pages/Collections';
+import { Customers } from './pages/Customers';
+
 import { Payments } from './pages/Payments';
 import { Attendance } from './pages/Attendance';
-import { Leaves } from './pages/Leaves';
 import { Reports } from './pages/Reports';
 
 // Route Guard to verify active JWT sessions
@@ -75,31 +73,15 @@ export default function App() {
             />
             
             <Route 
-              path="/farmers" 
+              path="/customers" 
               element={
                 <ProtectedRoute>
-                  <Farmers />
+                  <Customers />
                 </ProtectedRoute>
               } 
             />
 
-            <Route 
-              path="/visits" 
-              element={
-                <ProtectedRoute>
-                  <Visits />
-                </ProtectedRoute>
-              } 
-            />
 
-            <Route 
-              path="/collections" 
-              element={
-                <ProtectedRoute>
-                  <Collections />
-                </ProtectedRoute>
-              } 
-            />
 
             <Route 
               path="/payments" 
@@ -115,15 +97,6 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Attendance />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/leaves" 
-              element={
-                <ProtectedRoute>
-                  <Leaves />
                 </ProtectedRoute>
               } 
             />

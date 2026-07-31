@@ -69,8 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Mock password matching (simple fallback checks)
         // Checks standard mock password patterns
         const correctPassword = 
-          found.role === 'ADMIN' ? 'admin123' : 
-          found.role === 'MANAGER' ? 'manager123' : 'employee123';
+          found.role === 'ADMIN' ? 'admin123' : 'employee123';
         
         if (password !== correctPassword && password !== 'password') {
           throw new Error('Invalid credentials');

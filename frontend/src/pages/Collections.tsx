@@ -46,7 +46,7 @@ export const Collections: React.FC = () => {
           <div className="space-y-2"><label className="label">End date</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input" /></div>
           <div className="space-y-2"><label className="label">Village</label>
             <select value={villageFilter} onChange={(e) => setVillageFilter(e.target.value)} className="select"><option value="">All</option>{uniqueVillages.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
-          <div className="space-y-2"><label className="label">Farmer</label>
+          <div className="space-y-2"><label className="label">Customer</label>
             <select value={farmerFilter} onChange={(e) => setFarmerFilter(e.target.value)} className="select"><option value="">All</option>{farmers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></div>
         </div>
       </div>
@@ -70,7 +70,7 @@ export const Collections: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead><tr className="table-header">
-                <th className="table-header th">Farmer</th>
+                <th className="table-header th">Customer</th>
                 <th className="table-header th">Date / Shift</th>
                 <th className="table-header th text-center">Qty (L)</th>
                 <th className="table-header th text-center">Fat / SNF</th>

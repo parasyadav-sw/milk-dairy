@@ -29,7 +29,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         try {
           const defaultPasswords: { [key: string]: string } = {
             'admin@dairy.com': 'admin123',
-            'manager1@dairy.com': 'manager123',
             'employee1@dairy.com': 'employee123'
           };
           await login(roleEmail, defaultPasswords[roleEmail] || 'password');
@@ -44,12 +43,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const getNavLinks = () => {
     const links = [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/farmers', label: 'Farmers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/visits', label: 'Visits', icon: <CalendarCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/collections', label: 'Collections', icon: <Milk className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
       { path: '/payments', label: 'Payments', icon: <Milestone className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER'] },
       { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/leaves', label: 'Leaves', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
       { path: '/reports', label: 'Reports', icon: <FileText className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
     ];
     return links.filter(l => user && l.roles.includes(user.role));
@@ -117,7 +113,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="w-full bg-white border border-warm-200 rounded-lg text-body-sm font-medium px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
             >
               <option value="admin@dairy.com">Admin: Ramesh</option>
-              <option value="manager1@dairy.com">Manager: Vikram</option>
               <option value="employee1@dairy.com">Employee: Amit</option>
             </select>
           </div>

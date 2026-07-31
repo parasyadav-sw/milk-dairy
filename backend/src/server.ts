@@ -10,12 +10,12 @@ import { login, getProfile, seedInitialAdmin } from './controllers/authControlle
 import { createUser, getUsers, updateUser } from './controllers/userController';
 import { createRoute, getRoutes, updateRoute, deleteRoute } from './controllers/routeController';
 import { registerFarmer, getFarmers, getFarmerById, updateFarmer } from './controllers/farmerController';
-import { assignVisit, getVisits, updateVisit } from './controllers/visitController';
+
 import { recordCollection, getCollections } from './controllers/milkController';
 import { getPendingPayments, processPayment, getPaymentHistory } from './controllers/paymentController';
 import { clockIn, clockOut, getAttendance } from './controllers/attendanceController';
 import { applyLeave, approveOrRejectLeave, getLeaves } from './controllers/leaveController';
-import { getAdminDashboardStats, getManagerDashboardStats, getAuditLogs } from './controllers/reportController';
+import { getAdminDashboardStats, getAuditLogs } from './controllers/reportController';
 
 dotenv.config();
 
@@ -61,15 +61,15 @@ app.post('/api/upload', authenticateJWT, upload.single('photo'), (req, res) => {
 });
 
 // Users
-app.post('/api/users', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), createUser);
-app.get('/api/users', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), getUsers);
-app.put('/api/users/:id', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), updateUser);
+app.post('/api/users', authenticateJWT, requireRole(['ADMIN']), createUser);
+app.get('/api/users', authenticateJWT, requireRole(['ADMIN']), getUsers);
+app.put('/api/users/:id', authenticateJWT, requireRole(['ADMIN']), updateUser);
 
 // Routes
-app.post('/api/routes', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), createRoute);
+app.post('/api/routes', authenticateJWT, requireRole(['ADMIN']), createRoute);
 app.get('/api/routes', authenticateJWT, getRoutes);
-app.put('/api/routes/:id', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), updateRoute);
-app.delete('/api/routes/:id', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), deleteRoute);
+app.put('/api/routes/:id', authenticateJWT, requireRole(['ADMIN']), updateRoute);
+app.delete('/api/routes/:id', authenticateJWT, requireRole(['ADMIN']), deleteRoute);
 
 // Farmers
 app.post('/api/farmers', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), registerFarmer);
@@ -77,10 +77,7 @@ app.get('/api/farmers', authenticateJWT, getFarmers);
 app.get('/api/farmers/:id', authenticateJWT, getFarmerById);
 app.put('/api/farmers/:id', authenticateJWT, updateFarmer);
 
-// Visits
-app.post('/api/visits', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), assignVisit);
-app.get('/api/visits', authenticateJWT, getVisits);
-app.put('/api/visits/:id', authenticateJWT, updateVisit);
+
 
 // Milk Collections
 app.post('/api/collections', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), recordCollection);
@@ -98,12 +95,11 @@ app.get('/api/attendance', authenticateJWT, getAttendance);
 
 // Leaves
 app.post('/api/leaves', authenticateJWT, applyLeave);
-app.put('/api/leaves/:id', authenticateJWT, requireRole(['ADMIN', 'MANAGER']), approveOrRejectLeave);
+app.put('/api/leaves/:id', authenticateJWT, requireRole(['ADMIN']), approveOrRejectLeave);
 app.get('/api/leaves', authenticateJWT, getLeaves);
 
 // Reports & Analytics
 app.get('/api/reports/admin-dashboard', authenticateJWT, requireRole(['ADMIN']), getAdminDashboardStats);
-app.get('/api/reports/manager-dashboard', authenticateJWT, requireRole(['MANAGER']), getManagerDashboardStats);
 app.get('/api/reports/audit-logs', authenticateJWT, requireRole(['ADMIN']), getAuditLogs);
 
 // Global Error Handler

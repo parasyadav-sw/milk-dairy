@@ -7,7 +7,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
     email: string;
-    role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+    role: 'ADMIN' | 'EMPLOYEE';
     name: string;
   };
 }
@@ -30,7 +30,7 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
   }
 };
 
-export const requireRole = (roles: Array<'ADMIN' | 'MANAGER' | 'EMPLOYEE'>) => {
+export const requireRole = (roles: Array<'ADMIN' | 'EMPLOYEE'>) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });

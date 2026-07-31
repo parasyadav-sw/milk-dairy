@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { AdminDashboard } from './AdminDashboard';
-import { ManagerDashboard } from './ManagerDashboard';
 import { EmployeeDashboard } from './EmployeeDashboard';
 import { ShieldAlert } from 'lucide-react';
 
@@ -18,7 +17,6 @@ export const DashboardDispatcher: React.FC = () => {
   }
   switch (user.role) {
     case 'ADMIN': return <AdminDashboard />;
-    case 'MANAGER': return <ManagerDashboard />;
     case 'EMPLOYEE': return <EmployeeDashboard />;
     default: return (
       <div className="card p-8 text-center">

@@ -17,7 +17,9 @@ export const registerFarmer = async (req: AuthRequest, res: Response) => {
     gpsLocation,
     animalType,
     cowCount,
-    buffaloCount
+    buffaloCount,
+    cowMilkYield,
+    buffaloMilkYield
   } = req.body;
 
   try {
@@ -56,6 +58,8 @@ export const registerFarmer = async (req: AuthRequest, res: Response) => {
         cowCount: cows,
         buffaloCount: buffalos,
         totalAnimals,
+        cowMilkYield: cowMilkYield ? parseFloat(cowMilkYield) : 0.0,
+        buffaloMilkYield: buffaloMilkYield ? parseFloat(buffaloMilkYield) : 0.0,
         registeredById: employeeId
       }
     });
@@ -148,7 +152,9 @@ export const updateFarmer = async (req: AuthRequest, res: Response) => {
     gpsLocation,
     animalType,
     cowCount,
-    buffaloCount
+    buffaloCount,
+    cowMilkYield,
+    buffaloMilkYield
   } = req.body;
 
   try {
@@ -183,7 +189,9 @@ export const updateFarmer = async (req: AuthRequest, res: Response) => {
         animalType: animalType !== undefined ? animalType : farmer.animalType,
         cowCount: cows,
         buffaloCount: buffalos,
-        totalAnimals
+        totalAnimals,
+        cowMilkYield: cowMilkYield !== undefined ? parseFloat(cowMilkYield) : farmer.cowMilkYield,
+        buffaloMilkYield: buffaloMilkYield !== undefined ? parseFloat(buffaloMilkYield) : farmer.buffaloMilkYield
       }
     });
 

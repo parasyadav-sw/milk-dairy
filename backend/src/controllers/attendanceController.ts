@@ -87,14 +87,6 @@ export const getAttendance = async (req: AuthRequest, res: Response) => {
         include: { user: { select: { name: true, role: true } } },
         orderBy: { date: 'desc' }
       });
-    } else if (role === 'MANAGER') {
-      records = await prisma.attendance.findMany({
-        where: {
-          user: { managerId: userId }
-        },
-        include: { user: { select: { name: true, role: true } } },
-        orderBy: { date: 'desc' }
-      });
     } else {
       records = await prisma.attendance.findMany({
         where: { userId },

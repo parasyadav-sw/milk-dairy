@@ -7,21 +7,15 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
     const todayStr = new Date().toISOString().split('T')[0];
 
     const [
-      totalManagers,
       totalEmployees,
       totalFarmers,
-      todayVisits,
-      todayCompletedVisits,
       todayMilk,
       totalPayments,
       pendingCollections,
       allAuditLogs
     ] = await Promise.all([
-      prisma.user.count({ where: { role: 'MANAGER' } }),
       prisma.user.count({ where: { role: 'EMPLOYEE' } }),
       prisma.farmer.count(),
-      prisma.visit.count({ where: { date: todayStr } }),
-      prisma.visit.count({ where: { date: todayStr, status: 'COMPLETED' } }),
       prisma.milkCollection.aggregate({
         where: { date: todayStr },
         _sum: { quantityLitres: true }
@@ -101,11 +95,8 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
 
     res.json({
       cards: {
-        totalManagers,
         totalEmployees,
         totalFarmers,
-        todayVisits,
-        completedVisits: todayCompletedVisits,
         todayMilk: Math.round((todayMilk._sum.quantityLitres || 0) * 100) / 100,
         totalRevenue: Math.round((totalPayments._sum.amount || 0) * 100) / 100,
         pendingPayments: Math.round((pendingCollections._sum.totalAmount || 0) * 100) / 100
@@ -122,114 +113,7 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
   }
 };
 
-export const getManagerDashboardStats = async (req: AuthRequest, res: Response) => {
-  try {
-    const managerId = req.user?.id;
-    if (!managerId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    const [
-      assignedEmployees,
-      todayVisits,
-      todayPendingVisits,
-      todayMilk,
-      pendingLeaves,
-      todayAttendance
-    ] = await Promise.all([
-      prisma.user.findMany({ where: { managerId, role: 'EMPLOYEE' } }),
-      prisma.visit.count({ where: { managerId, date: todayStr } }),
-      prisma.visit.count({ where: { managerId, date: todayStr, status: 'PENDING' } }),
-      prisma.milkCollection.aggregate({
-        where: {
-          date: todayStr,
-          collectedBy: { managerId }
-        },
-        _sum: { quantityLitres: true }
-      }),
-      prisma.leave.count({
-        where: {
-          status: 'PENDING',
-          user: { managerId }
-        }
-      }),
-      prisma.attendance.count({
-        where: {
-          date: todayStr,
-          status: 'PRESENT',
-          user: { managerId }
-        }
-      })
-    ]);
-
-    // Village collection for this manager
-    const managerCollections = await prisma.milkCollection.findMany({
-      where: { collectedBy: { managerId } },
-      include: { farmer: { select: { village: true } } }
-    });
-
-    const villageMap: { [key: string]: number } = {};
-    managerCollections.forEach((col: any) => {
-      const v = col.farmer.village;
-      villageMap[v] = (villageMap[v] || 0) + col.quantityLitres;
-    });
-
-    const villageWise = Object.entries(villageMap)
-      .map(([name, litres]) => ({ name, litres: Math.round(litres * 100) / 100 }))
-      .sort((a, b) => b.litres - a.litres);
-
-    // Employee completion rates
-    const employeeVisits = await prisma.visit.groupBy({
-      by: ['employeeId', 'status'],
-      where: { managerId }
-    });
-
-    const empStats: { [key: number]: { completed: number; total: number } } = {};
-    employeeVisits.forEach((v: any) => {
-      if (!empStats[v.employeeId]) {
-        empStats[v.employeeId] = { completed: 0, total: 0 };
-      }
-      if (v.status === 'COMPLETED') {
-        empStats[v.employeeId].completed += 1;
-      }
-      empStats[v.employeeId].total += 1;
-    });
-
-    const employeesList = await prisma.user.findMany({
-      where: { managerId },
-      select: { id: true, name: true }
-    });
-
-    const performance = employeesList.map((emp: any) => {
-      const stats = empStats[emp.id] || { completed: 0, total: 0 };
-      const rate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-      return {
-        name: emp.name,
-        completionRate: rate,
-        totalVisits: stats.total
-      };
-    });
-
-    res.json({
-      cards: {
-        employeesCount: assignedEmployees.length,
-        todayVisits,
-        pendingVisits: todayPendingVisits,
-        todayMilk: Math.round((todayMilk._sum.quantityLitres || 0) * 100) / 100,
-        pendingLeaves,
-        attendanceToday: todayAttendance
-      },
-      charts: {
-        villageWise,
-        performance
-      }
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
 export const getAuditLogs = async (req: AuthRequest, res: Response) => {
   try {
     const logs = await prisma.auditLog.findMany({

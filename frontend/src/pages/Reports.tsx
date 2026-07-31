@@ -30,7 +30,7 @@ export const Reports: React.FC = () => {
 
   const handleExportCSV = () => {
     if (filteredData.length === 0) return alert('No data to export!');
-    const headers = ['ID', 'Farmer', 'FarmerID', 'Date', 'Shift', 'Litres', 'Fat%', 'SNF%', 'Rate/L', 'Amount', 'Collector', 'Status'];
+    const headers = ['ID', 'Customer', 'CustomerID', 'Date', 'Shift', 'Litres', 'Fat%', 'SNF%', 'Rate/L', 'Amount', 'Collector', 'Status'];
     const rows = filteredData.map(c => [c.id, farmers.find(f => f.id === c.farmerId)?.name || '', c.farmerId, c.date, c.timeOfDay, c.quantityLitres, c.fatPercent, c.snfPercent, c.ratePerLitre, c.totalAmount, c.collectedByName || '', c.paymentStatus]);
     const csv = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const link = document.createElement("a"); link.setAttribute("href", encodeURI(csv)); link.setAttribute("download", `Report_${Date.now()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -38,7 +38,7 @@ export const Reports: React.FC = () => {
 
   const handleExportExcel = () => {
     if (filteredData.length === 0) return alert('No data to export!');
-    const data = filteredData.map(c => ({ 'ID': c.id, 'Farmer': farmers.find(f => f.id === c.farmerId)?.name || '', 'FarmerID': c.farmerId, 'Date': c.date, 'Shift': c.timeOfDay, 'Litres': c.quantityLitres, 'Fat%': c.fatPercent, 'SNF%': c.snfPercent, 'Rate/L': c.ratePerLitre, 'Amount': c.totalAmount, 'Collector': c.collectedByName || '', 'Status': c.paymentStatus }));
+    const data = filteredData.map(c => ({ 'ID': c.id, 'Customer': farmers.find(f => f.id === c.farmerId)?.name || '', 'CustomerID': c.farmerId, 'Date': c.date, 'Shift': c.timeOfDay, 'Litres': c.quantityLitres, 'Fat%': c.fatPercent, 'SNF%': c.snfPercent, 'Rate/L': c.ratePerLitre, 'Amount': c.totalAmount, 'Collector': c.collectedByName || '', 'Status': c.paymentStatus }));
     const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Collections"); XLSX.writeFile(wb, `Report_${Date.now()}.xlsx`);
   };
 
@@ -50,7 +50,7 @@ export const Reports: React.FC = () => {
     const totalL = filteredData.reduce((s, c) => s + c.quantityLitres, 0);
     const totalA = filteredData.reduce((s, c) => s + c.totalAmount, 0);
     doc.text(`Total: ${totalL.toFixed(1)}L | Cost: Rs. ${totalA.toLocaleString()}`, 14, 29);
-    doc.autoTable({ head: [['Farmer', 'Date', 'Shift', 'Litres', 'Fat/SNF', 'Amount', 'Status']], body: filteredData.map(c => [farmers.find(f => f.id === c.farmerId)?.name || '', c.date, c.timeOfDay, `${c.quantityLitres}L`, `${c.fatPercent}/${c.snfPercent}`, `Rs.${c.totalAmount}`, c.paymentStatus]), startY: 34, theme: 'grid', headStyles: { fillColor: [47, 82, 51], fontSize: 8 }, bodyStyles: { fontSize: 7 }, alternateRowStyles: { fillColor: [243, 236, 224] } });
+    doc.autoTable({ head: [['Customer', 'Date', 'Shift', 'Litres', 'Fat/SNF', 'Amount', 'Status']], body: filteredData.map(c => [farmers.find(f => f.id === c.farmerId)?.name || '', c.date, c.timeOfDay, `${c.quantityLitres}L`, `${c.fatPercent}/${c.snfPercent}`, `Rs.${c.totalAmount}`, c.paymentStatus]), startY: 34, theme: 'grid', headStyles: { fillColor: [47, 82, 51], fontSize: 8 }, bodyStyles: { fontSize: 7 }, alternateRowStyles: { fillColor: [243, 236, 224] } });
     doc.save(`Report_${Date.now()}.pdf`);
   };
 
@@ -72,7 +72,7 @@ export const Reports: React.FC = () => {
           <div className="space-y-2"><label className="label">End date</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input" /></div>
           <div className="space-y-2"><label className="label">Village</label>
             <select value={selectedVillage} onChange={(e) => setSelectedVillage(e.target.value)} className="select"><option value="">All</option>{uniqueVillages.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
-          <div className="space-y-2"><label className="label">Farmer</label>
+          <div className="space-y-2"><label className="label">Customer</label>
             <select value={selectedFarmer} onChange={(e) => setSelectedFarmer(e.target.value)} className="select"><option value="">All</option>{farmers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></div>
           <div className="space-y-2"><label className="label">Agent</label>
             <select value={selectedCollector} onChange={(e) => setSelectedCollector(e.target.value)} className="select"><option value="">All</option>{uniqueCollectors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
@@ -94,8 +94,8 @@ export const Reports: React.FC = () => {
         <div className="overflow-x-auto max-h-[400px]">
           <table className="w-full text-left">
             <thead><tr className="table-header">
-              <th className="table-header th">Farmer ID</th>
-              <th className="table-header th">Farmer</th>
+              <th className="table-header th">Customer ID</th>
+              <th className="table-header th">Customer</th>
               <th className="table-header th">Date</th>
               <th className="table-header th text-center">Shift</th>
               <th className="table-header th text-center">Litres</th>

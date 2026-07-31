@@ -47,7 +47,7 @@ export const Payments: React.FC = () => {
       <div className="page-header">
         <div>
           <h1 className="page-title">Payments</h1>
-          <p className="page-subtitle">Manage farmer payouts and settlements</p>
+          <p className="page-subtitle">Manage customer payouts and settlements</p>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export const Payments: React.FC = () => {
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search farmer..." className="input pl-9" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer..." className="input pl-9" />
           </div>
           {pendingPaymentsList.length > 0 ? (
             <div className="space-y-3">
@@ -98,7 +98,7 @@ export const Payments: React.FC = () => {
           </div>
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {payments.map(p => {
-              const fName = farmers.find(f => f.id === p.farmerId)?.name || p.farmerName || 'Farmer';
+              const fName = farmers.find(f => f.id === p.farmerId)?.name || p.farmerName || 'Customer';
               return (
                 <div key={p.id} className="p-4 bg-warm-50 border border-warm-100 rounded-xl text-body-sm">
                   <div className="flex items-center justify-between">

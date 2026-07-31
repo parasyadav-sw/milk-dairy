@@ -6,11 +6,11 @@ export const createRoute = async (req: AuthRequest, res: Response) => {
   const { name, description, village, assignedEmployeeId } = req.body;
 
   try {
-    const managerId = req.user?.id;
+    const adminId = req.user?.id;
     const role = req.user?.role;
 
-    if (!managerId || (role !== 'ADMIN' && role !== 'MANAGER')) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!adminId || role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Access denied: Only Admins can manage routes' });
     }
 
     if (!name || !village) {
@@ -22,7 +22,7 @@ export const createRoute = async (req: AuthRequest, res: Response) => {
         name,
         description,
         village,
-        managerId: role === 'ADMIN' ? (req.body.managerId ? parseInt(req.body.managerId) : managerId) : managerId,
+        adminId,
         assignedEmployeeId: assignedEmployeeId ? parseInt(assignedEmployeeId) : null
       }
     });
@@ -47,14 +47,7 @@ export const getRoutes = async (req: AuthRequest, res: Response) => {
     if (role === 'ADMIN') {
       routes = await prisma.route.findMany({
         include: {
-          manager: { select: { name: true } },
-          assignedEmployee: { select: { name: true } }
-        }
-      });
-    } else if (role === 'MANAGER') {
-      routes = await prisma.route.findMany({
-        where: { managerId: userId },
-        include: {
+          admin: { select: { name: true } },
           assignedEmployee: { select: { name: true } }
         }
       });
@@ -63,7 +56,7 @@ export const getRoutes = async (req: AuthRequest, res: Response) => {
       routes = await prisma.route.findMany({
         where: { assignedEmployeeId: userId },
         include: {
-          manager: { select: { name: true } }
+          admin: { select: { name: true } }
         }
       });
     }
@@ -88,7 +81,7 @@ export const updateRoute = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Route not found' });
     }
 
-    if (role !== 'ADMIN' && existingRoute.managerId !== userId) {
+    if (role !== 'ADMIN' && existingRoute.adminId !== userId) {
       return res.status(403).json({ error: 'Forbidden: You do not own this route' });
     }
 
@@ -121,7 +114,7 @@ export const deleteRoute = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Route not found' });
     }
 
-    if (role !== 'ADMIN' && existingRoute.managerId !== userId) {
+    if (role !== 'ADMIN' && existingRoute.adminId !== userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 

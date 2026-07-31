@@ -5,7 +5,7 @@ export interface User {
   id: number;
   email: string;
   name: string;
-  role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+  role: 'ADMIN' | 'EMPLOYEE';
   status: 'ACTIVE' | 'INACTIVE';
   managerId?: number | null;
   managerName?: string;
@@ -29,31 +29,17 @@ export interface Farmer {
   cowCount: number;
   buffaloCount: number;
   totalAnimals: number;
+  cowMilkYield?: number;
+  buffaloMilkYield?: number;
   registeredById: number;
   registeredByName?: string;
   createdAt: string;
 }
 
-export interface Visit {
-  id: number;
-  date: string;
-  time: string;
-  employeeId: number;
-  employeeName: string;
-  managerId: number;
-  farmerId: string;
-  farmerName: string;
-  village: string;
-  remarks?: string;
-  nextVisitDate?: string;
-  gpsLocation?: string;
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
-  photos?: string; // comma-separated image URLs
-}
+
 
 export interface MilkCollection {
   id: number;
-  visitId?: number | null;
   date: string;
   timeOfDay: 'MORNING' | 'EVENING';
   quantityLitres: number;
@@ -120,7 +106,6 @@ interface DatabaseContextType {
   setApiMode: (val: boolean) => void;
   users: User[];
   farmers: Farmer[];
-  visits: Visit[];
   collections: MilkCollection[];
   payments: Payment[];
   attendance: Attendance[];
@@ -133,8 +118,6 @@ interface DatabaseContextType {
   updateUser: (id: number, data: Partial<User>) => Promise<User>;
   addFarmer: (data: Partial<Farmer>) => Promise<Farmer>;
   updateFarmer: (id: string, data: Partial<Farmer>) => Promise<Farmer>;
-  assignVisit: (data: Partial<Visit>) => Promise<Visit>;
-  updateVisit: (id: number, data: Partial<Visit>) => Promise<Visit>;
   recordMilk: (data: Partial<MilkCollection>) => Promise<MilkCollection>;
   processPayment: (farmerId: string, txnRef?: string) => Promise<Payment>;
   clockIn: (userId: number) => Promise<Attendance>;
@@ -158,7 +141,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Local State holding data
   const [users, setUsers] = useState<User[]>([]);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
   const [collections, setCollections] = useState<MilkCollection[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
@@ -170,32 +152,25 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!localStorage.getItem('mock_seeded')) {
       const initialUsers: User[] = [
         { id: 1, email: 'admin@dairy.com', name: 'Ramesh Kumar (Admin)', role: 'ADMIN', status: 'ACTIVE' },
-        { id: 2, email: 'manager1@dairy.com', name: 'Vikram Singh (Manager)', role: 'MANAGER', status: 'ACTIVE' },
-        { id: 3, email: 'manager2@dairy.com', name: 'Sanjay Sharma (Manager)', role: 'MANAGER', status: 'ACTIVE' },
-        { id: 4, email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 2 },
-        { id: 5, email: 'employee2@dairy.com', name: 'Rahul Verma (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 2 },
-        { id: 6, email: 'employee3@dairy.com', name: 'Deepak Rao (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 3 },
-        { id: 7, email: 'employee4@dairy.com', name: 'Suresh Kumar (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 2 },
-        { id: 8, email: 'employee5@dairy.com', name: 'Vikram Singh (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE', managerId: 3 }
+        { id: 4, email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 5, email: 'employee2@dairy.com', name: 'Rahul Verma (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 6, email: 'employee3@dairy.com', name: 'Deepak Rao (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 7, email: 'employee4@dairy.com', name: 'Suresh Kumar (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
+        { id: 8, email: 'employee5@dairy.com', name: 'Vikram Singh (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' }
       ];
 
       const initialFarmers: Farmer[] = [
-        { id: 'FMR-0001', name: 'Harish Choudhary', mobile: '9876543210', gender: 'MALE', age: 45, aadhaar: '1234-5678-9012', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'Plot 4, Near Temple, Rajpura', animalType: 'COW', cowCount: 5, buffaloCount: 0, totalAnimals: 5, registeredById: 4, createdAt: '2026-07-20T10:00:00.000Z' },
-        { id: 'FMR-0002', name: 'Ram Niwas', mobile: '9988776655', gender: 'MALE', age: 52, aadhaar: '2345-6789-0123', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'House 12, Main Road, Rajpura', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 4, totalAnimals: 4, registeredById: 4, createdAt: '2026-07-21T11:00:00.000Z' },
-        { id: 'FMR-0003', name: 'Sunita Devi', mobile: '9776655443', gender: 'FEMALE', age: 39, aadhaar: '3456-7890-1234', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Ward 2, Kalyanpur', animalType: 'BOTH', cowCount: 3, buffaloCount: 3, totalAnimals: 6, registeredById: 5, createdAt: '2026-07-22T09:30:00.000Z' },
-        { id: 'FMR-0004', name: 'Devendra Yadav', mobile: '9665544332', gender: 'MALE', age: 48, aadhaar: '4567-8901-2345', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Farmhouse 1A, Kalyanpur', animalType: 'COW', cowCount: 8, buffaloCount: 0, totalAnimals: 8, registeredById: 5, createdAt: '2026-07-23T14:15:00.000Z' },
-        { id: 'FMR-0005', name: 'Manoj Gurjar', mobile: '9554433221', gender: 'MALE', age: 34, aadhaar: '5678-9012-3456', village: 'Chandpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Sector 5, Chandpur', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 6, totalAnimals: 6, registeredById: 6, createdAt: '2026-07-24T12:00:00.000Z' },
-        { id: 'FMR-0006', name: 'Ramesh Yadav', mobile: '9443322110', gender: 'MALE', age: 41, aadhaar: '6789-0123-4567', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'Field 3, Rajpura', animalType: 'COW', cowCount: 4, buffaloCount: 0, totalAnimals: 4, registeredById: 7, createdAt: '2026-07-25T09:00:00.000Z' },
-        { id: 'FMR-0007', name: 'Geeta Devi', mobile: '9332211009', gender: 'FEMALE', age: 36, aadhaar: '7890-1234-5678', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Ward 5, Kalyanpur', animalType: 'BOTH', cowCount: 2, buffaloCount: 3, totalAnimals: 5, registeredById: 7, createdAt: '2026-07-26T10:30:00.000Z' },
-        { id: 'FMR-0008', name: 'Mohan Lal', mobile: '9221100998', gender: 'MALE', age: 50, aadhaar: '8901-2345-6789', village: 'Chandpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Plot 8, Chandpur', animalType: 'COW', cowCount: 6, buffaloCount: 0, totalAnimals: 6, registeredById: 8, createdAt: '2026-07-27T11:00:00.000Z' }
+        { id: 'FMR-0001', name: 'Harish Choudhary', mobile: '9876543210', gender: 'MALE', age: 45, aadhaar: '1234-5678-9012', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'Plot 4, Near Temple, Rajpura', animalType: 'COW', cowCount: 5, buffaloCount: 0, totalAnimals: 5, cowMilkYield: 6.5, buffaloMilkYield: 0.0, registeredById: 4, createdAt: '2026-07-20T10:00:00.000Z' },
+        { id: 'FMR-0002', name: 'Ram Niwas', mobile: '9988776655', gender: 'MALE', age: 52, aadhaar: '2345-6789-0123', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'House 12, Main Road, Rajpura', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 4, totalAnimals: 4, cowMilkYield: 0.0, buffaloMilkYield: 8.0, registeredById: 4, createdAt: '2026-07-21T11:00:00.000Z' },
+        { id: 'FMR-0003', name: 'Sunita Devi', mobile: '9776655443', gender: 'FEMALE', age: 39, aadhaar: '3456-7890-1234', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Ward 2, Kalyanpur', animalType: 'BOTH', cowCount: 3, buffaloCount: 3, totalAnimals: 6, cowMilkYield: 7.0, buffaloMilkYield: 9.0, registeredById: 5, createdAt: '2026-07-22T09:30:00.000Z' },
+        { id: 'FMR-0004', name: 'Devendra Yadav', mobile: '9665544332', gender: 'MALE', age: 48, aadhaar: '4567-8901-2345', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Farmhouse 1A, Kalyanpur', animalType: 'COW', cowCount: 8, buffaloCount: 0, totalAnimals: 8, cowMilkYield: 5.8, buffaloMilkYield: 0.0, registeredById: 5, createdAt: '2026-07-23T14:15:00.000Z' },
+        { id: 'FMR-0005', name: 'Manoj Gurjar', mobile: '9554433221', gender: 'MALE', age: 34, aadhaar: '5678-9012-3456', village: 'Chandpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Sector 5, Chandpur', animalType: 'BUFFALO', cowCount: 0, buffaloCount: 6, totalAnimals: 6, cowMilkYield: 0.0, buffaloMilkYield: 7.5, registeredById: 6, createdAt: '2026-07-24T12:00:00.000Z' },
+        { id: 'FMR-0006', name: 'Ramesh Yadav', mobile: '9443322110', gender: 'MALE', age: 41, aadhaar: '6789-0123-4567', village: 'Rajpura', taluka: 'Jaipur', district: 'Jaipur', address: 'Field 3, Rajpura', animalType: 'COW', cowCount: 4, buffaloCount: 0, totalAnimals: 4, cowMilkYield: 6.2, buffaloMilkYield: 0.0, registeredById: 7, createdAt: '2026-07-25T09:00:00.000Z' },
+        { id: 'FMR-0007', name: 'Geeta Devi', mobile: '9332211009', gender: 'FEMALE', age: 36, aadhaar: '7890-1234-5678', village: 'Kalyanpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Ward 5, Kalyanpur', animalType: 'BOTH', cowCount: 2, buffaloCount: 3, totalAnimals: 5, cowMilkYield: 6.0, buffaloMilkYield: 8.2, registeredById: 7, createdAt: '2026-07-26T10:30:00.000Z' },
+        { id: 'FMR-0008', name: 'Mohan Lal', mobile: '9221100998', gender: 'MALE', age: 50, aadhaar: '8901-2345-6789', village: 'Chandpur', taluka: 'Jaipur', district: 'Jaipur', address: 'Plot 8, Chandpur', animalType: 'COW', cowCount: 6, buffaloCount: 0, totalAnimals: 6, cowMilkYield: 6.0, buffaloMilkYield: 0.0, registeredById: 8, createdAt: '2026-07-27T11:00:00.000Z' }
       ];
 
-      const initialVisits: Visit[] = [
-        { id: 1, date: '2026-07-30', time: '07:30', employeeId: 4, employeeName: 'Amit Patel', managerId: 2, farmerId: 'FMR-0001', farmerName: 'Harish Choudhary', village: 'Rajpura', remarks: 'Morning milk check', status: 'PENDING' },
-        { id: 2, date: '2026-07-30', time: '08:00', employeeId: 4, employeeName: 'Amit Patel', managerId: 2, farmerId: 'FMR-0002', farmerName: 'Ram Niwas', village: 'Rajpura', remarks: 'Daily collection', status: 'PENDING' },
-        { id: 3, date: '2026-07-30', time: '07:45', employeeId: 5, employeeName: 'Rahul Verma', managerId: 2, farmerId: 'FMR-0003', farmerName: 'Sunita Devi', village: 'Kalyanpur', remarks: 'Morning checkup', status: 'COMPLETED', nextVisitDate: '2026-07-31', gpsLocation: '26.9124, 75.7873' },
-        { id: 4, date: '2026-07-30', time: '08:15', employeeId: 5, employeeName: 'Rahul Verma', managerId: 2, farmerId: 'FMR-0004', farmerName: 'Devendra Yadav', village: 'Kalyanpur', status: 'PENDING' }
-      ];
+
 
       // Seed 7 days of collection history for charts
       const initialCollections: MilkCollection[] = [];
@@ -391,10 +366,9 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       });
 
-      // Today's collections so far (completed visit 3)
+      // Today's collections so far
       initialCollections.push({
         id: colId++,
-        visitId: 3,
         date: '2026-07-30',
         timeOfDay: 'MORNING',
         quantityLitres: 15,
@@ -433,7 +407,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       localStorage.setItem('users', JSON.stringify(initialUsers));
       localStorage.setItem('farmers', JSON.stringify(initialFarmers));
-      localStorage.setItem('visits', JSON.stringify(initialVisits));
       localStorage.setItem('collections', JSON.stringify(initialCollections));
       localStorage.setItem('payments', JSON.stringify(initialPayments));
       localStorage.setItem('attendance', JSON.stringify(initialAttendance));
@@ -452,10 +425,9 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       try {
-        const [uRes, fRes, vRes, cRes, pRes, aRes, lRes, logRes] = await Promise.all([
+        const [uRes, fRes, cRes, pRes, aRes, lRes, logRes] = await Promise.all([
           fetch('/api/users', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/farmers', { headers }).then(r => r.ok ? r.json() : []),
-          fetch('/api/visits', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/collections', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/payments', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/attendance', { headers }).then(r => r.ok ? r.json() : []),
@@ -465,7 +437,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         setUsers(uRes);
         setFarmers(fRes);
-        setVisits(vRes);
         setCollections(cRes);
         setPayments(pRes);
         setAttendance(aRes);
@@ -483,7 +454,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const loadLocalStorage = () => {
     setUsers(JSON.parse(localStorage.getItem('users') || '[]'));
     setFarmers(JSON.parse(localStorage.getItem('farmers') || '[]'));
-    setVisits(JSON.parse(localStorage.getItem('visits') || '[]'));
     setCollections(JSON.parse(localStorage.getItem('collections') || '[]'));
     setPayments(JSON.parse(localStorage.getItem('payments') || '[]'));
     setAttendance(JSON.parse(localStorage.getItem('attendance') || '[]'));
@@ -517,7 +487,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         name: data.name || '',
         role: data.role || 'EMPLOYEE',
         status: 'ACTIVE',
-        managerId: data.managerId || (creator.role === 'MANAGER' ? creator.id : null),
+        managerId: null,
         createdAt: new Date().toISOString()
       };
       localUsers.push(newUser);
@@ -595,6 +565,8 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         cowCount: cows,
         buffaloCount: buffalos,
         totalAnimals: cows + buffalos,
+        cowMilkYield: data.cowMilkYield ? Number(data.cowMilkYield) : 0.0,
+        buffaloMilkYield: data.buffaloMilkYield ? Number(data.buffaloMilkYield) : 0.0,
         registeredById: creator.id || 4,
         registeredByName: creator.name || 'Field Agent',
         createdAt: new Date().toISOString()
@@ -635,7 +607,9 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ...data,
         cowCount: cows,
         buffaloCount: buffalos,
-        totalAnimals: cows + buffalos
+        totalAnimals: cows + buffalos,
+        cowMilkYield: data.cowMilkYield !== undefined ? Number(data.cowMilkYield) : localFarmers[idx].cowMilkYield,
+        buffaloMilkYield: data.buffaloMilkYield !== undefined ? Number(data.buffaloMilkYield) : localFarmers[idx].buffaloMilkYield
       };
       localStorage.setItem('farmers', JSON.stringify(localFarmers));
 
@@ -645,81 +619,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const assignVisit = async (data: Partial<Visit>) => {
-    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
-    if (isApiMode) {
-      const res = await fetch('/api/visits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
-        },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to assign visit');
-      const newVisit = await res.json();
-      await refreshData();
-      return newVisit;
-    } else {
-      const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
-      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
-      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
-      
-      const emp = localUsers.find(u => u.id === Number(data.employeeId));
-      const farmer = localFarmers.find(f => f.id === data.farmerId);
 
-      const nextId = localVisits.reduce((max: number, v: any) => v.id > max ? v.id : max, 0) + 1;
-      const newVisit: Visit = {
-        id: nextId,
-        date: data.date || '',
-        time: data.time || '',
-        employeeId: Number(data.employeeId),
-        employeeName: emp?.name || 'Agent',
-        managerId: creator.id || 2,
-        farmerId: data.farmerId || '',
-        farmerName: farmer?.name || 'Farmer',
-        village: farmer?.village || '',
-        remarks: data.remarks,
-        status: 'PENDING'
-      };
-
-      localVisits.push(newVisit);
-      localStorage.setItem('visits', JSON.stringify(localVisits));
-
-      logAudit(creator.name, 'ASSIGN_VISIT', `Assigned farmer visit to ${newVisit.employeeName} for ${newVisit.farmerName}`);
-      loadLocalStorage();
-      return newVisit;
-    }
-  };
-
-  const updateVisit = async (id: number, data: Partial<Visit>) => {
-    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
-    if (isApiMode) {
-      const res = await fetch(`/api/visits/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
-        },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to update visit');
-      const updated = await res.json();
-      await refreshData();
-      return updated;
-    } else {
-      const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
-      const idx = localVisits.findIndex(v => v.id === id);
-      if (idx === -1) throw new Error('Visit not found');
-      
-      localVisits[idx] = { ...localVisits[idx], ...data };
-      localStorage.setItem('visits', JSON.stringify(localVisits));
-
-      logAudit(creator.name, 'UPDATE_VISIT', `Updated visit status to ${localVisits[idx].status} for ${localVisits[idx].farmerName}`);
-      loadLocalStorage();
-      return localVisits[idx];
-    }
-  };
 
   const recordMilk = async (data: Partial<MilkCollection>) => {
     const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
@@ -750,7 +650,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const nextId = localCollections.reduce((max: number, c: any) => c.id > max ? c.id : max, 0) + 1;
       const newCollection: MilkCollection = {
         id: nextId,
-        visitId: data.visitId ? Number(data.visitId) : null,
         date: data.date || new Date().toISOString().split('T')[0],
         timeOfDay: data.timeOfDay || 'MORNING',
         quantityLitres: qty,
@@ -770,16 +669,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       localCollections.push(newCollection);
       localStorage.setItem('collections', JSON.stringify(localCollections));
-
-      // Mark associated visit as COMPLETED
-      if (data.visitId) {
-        const localVisits = JSON.parse(localStorage.getItem('visits') || '[]') as Visit[];
-        const vIdx = localVisits.findIndex(v => v.id === Number(data.visitId));
-        if (vIdx !== -1) {
-          localVisits[vIdx].status = 'COMPLETED';
-          localStorage.setItem('visits', JSON.stringify(localVisits));
-        }
-      }
 
       logAudit(creator.name, 'RECORD_MILK', `Recorded ${qty}L milk for ${farmer?.name}`);
       loadLocalStorage();
@@ -1036,7 +925,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setApiMode,
       users,
       farmers,
-      visits,
       collections,
       payments,
       attendance,
@@ -1047,8 +935,6 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateUser,
       addFarmer,
       updateFarmer,
-      assignVisit,
-      updateVisit,
       recordMilk,
       processPayment,
       clockIn,

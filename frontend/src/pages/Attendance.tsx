@@ -9,10 +9,6 @@ export const Attendance: React.FC = () => {
 
   const filteredAttendance = attendance.filter(a => {
     if (user?.role === 'EMPLOYEE') return a.userId === user.id;
-    if (user?.role === 'MANAGER') {
-      const emp = users.find(u => u.id === a.userId);
-      return emp?.managerId === user.id;
-    }
     return true;
   });
 
@@ -53,7 +49,7 @@ export const Attendance: React.FC = () => {
                       </span>
                     </td>
                     <td className="table-cell text-body-sm text-muted">
-                      <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {a.date}</span>
+                      <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {a.date.split('-').reverse().join('/')}</span>
                     </td>
                     <td className="table-cell text-center">
                       <span className={`badge ${statusStyles[a.status] || 'badge-neutral'}`}>{a.status}</span>

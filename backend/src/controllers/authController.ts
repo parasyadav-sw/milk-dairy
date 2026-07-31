@@ -62,8 +62,7 @@ export const login = async (req: AuthRequest, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
-        managerId: user.managerId
+        role: user.role
       }
     });
   } catch (error: any) {
@@ -85,7 +84,6 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         name: true,
         role: true,
         status: true,
-        managerId: true,
         createdAt: true
       }
     });

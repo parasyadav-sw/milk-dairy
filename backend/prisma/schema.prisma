@@ -9,7 +9,6 @@ generator client {
 
 enum Role {
   ADMIN
-  MANAGER
   EMPLOYEE
 }
 
@@ -21,15 +20,8 @@ model User {
   role             Role
   status           String           @default("ACTIVE")
   
-  // Self-relation for manager-employee hierarchy
-  managerId        Int?
-  manager          User?            @relation("ManagerEmployees", fields: [managerId], references: [id])
-  employees        User[]           @relation("ManagerEmployees")
-
-  routesCreated    Route[]          @relation("ManagerRoutes")
+  routesCreated    Route[]          @relation("AdminRoutes")
   routesAssigned   Route[]          @relation("EmployeeRoutes")
-  visits           Visit[]          @relation("EmployeeVisits")
-  managedVisits    Visit[]          @relation("ManagerVisits")
   milkCollections  MilkCollection[] @relation("CollectedBy")
   payments         Payment[]        @relation("ProcessedBy")
   attendance       Attendance[]
@@ -60,11 +52,12 @@ model Farmer {
   cowCount        Int              @default(0)
   buffaloCount    Int              @default(0)
   totalAnimals    Int              @default(0)
+  cowMilkYield    Float            @default(0.0)
+  buffaloMilkYield Float           @default(0.0)
 
   registeredById  Int
   registeredBy    User             @relation(fields: [registeredById], references: [id])
   
-  visits          Visit[]
   milkCollections MilkCollection[]
   payments        Payment[]
   
@@ -78,8 +71,8 @@ model Route {
   description        String?
   village            String
   
-  managerId          Int
-  manager            User     @relation("ManagerRoutes", fields: [managerId], references: [id])
+  adminId            Int
+  admin              User     @relation("AdminRoutes", fields: [adminId], references: [id])
   
   assignedEmployeeId Int?
   assignedEmployee   User?    @relation("EmployeeRoutes", fields: [assignedEmployeeId], references: [id])
@@ -88,35 +81,10 @@ model Route {
   updatedAt          DateTime @updatedAt
 }
 
-model Visit {
-  id            Int              @id @default(autoincrement())
-  date          String           // "YYYY-MM-DD"
-  time          String           // "HH:MM"
-  
-  employeeId    Int
-  employee      User             @relation("EmployeeVisits", fields: [employeeId], references: [id])
-  
-  managerId     Int
-  manager       User             @relation("ManagerVisits", fields: [managerId], references: [id])
-  
-  farmerId      String
-  farmer        Farmer           @relation(fields: [farmerId], references: [id])
-  
-  remarks       String?
-  nextVisitDate String?
-  gpsLocation   String?
-  status        String           // "PENDING", "COMPLETED", "CANCELLED"
-  photos        String?          // Comma-separated image paths or URLs
-  
-  milkCollections MilkCollection[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-}
+
 
 model MilkCollection {
   id             Int      @id @default(autoincrement())
-  visitId        Int?
-  visit          Visit?   @relation(fields: [visitId], references: [id])
   
   date           String   // "YYYY-MM-DD"
   timeOfDay      String   // "MORNING", "EVENING"

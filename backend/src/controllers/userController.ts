@@ -14,13 +14,8 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Role hierarchy checks
-    if (creatorRole === 'MANAGER') {
-      if (role !== 'EMPLOYEE') {
-        return res.status(403).json({ error: 'Managers can only create Employees' });
-      }
-    } else if (creatorRole !== 'ADMIN') {
-      return res.status(403).json({ error: 'Access denied' });
+    if (creatorRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Access denied: Only Admins can manage users' });
     }
 
     // Validation
@@ -35,17 +30,12 @@ export const createUser = async (req: AuthRequest, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Set managerId: If Manager creates, enforce managerId as the creator's ID.
-    // If Admin creates an employee, they can pass managerId.
-    const finalManagerId = creatorRole === 'MANAGER' ? creatorId : (managerId ? parseInt(managerId) : null);
-
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
         role,
-        managerId: finalManagerId,
         status: 'ACTIVE'
       },
       select: {
@@ -53,7 +43,6 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         email: true,
         name: true,
         role: true,
-        managerId: true,
         status: true,
         createdAt: true
       }
@@ -86,7 +75,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
     let users;
 
     if (requesterRole === 'ADMIN') {
-      // Admins see everyone, include manager details
+      // Admins see everyone
       users = await prisma.user.findMany({
         select: {
           id: true,
@@ -94,26 +83,9 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
           name: true,
           role: true,
           status: true,
-          managerId: true,
-          manager: { select: { name: true } },
           createdAt: true
         },
         orderBy: { id: 'asc' }
-      });
-    } else if (requesterRole === 'MANAGER') {
-      // Managers see employees assigned to them
-      users = await prisma.user.findMany({
-        where: { managerId: requesterId },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          status: true,
-          managerId: true,
-          createdAt: true
-        },
-        orderBy: { name: 'asc' }
       });
     } else {
       return res.status(403).json({ error: 'Forbidden' });
@@ -127,7 +99,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
 export const updateUser = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { name, email, managerId, status, password } = req.body;
+  const { name, email, status, password } = req.body;
 
   try {
     const requesterRole = req.user?.role;
@@ -144,15 +116,13 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (requesterRole === 'MANAGER' && targetUser.managerId !== requesterId) {
-      return res.status(403).json({ error: 'Managers can only update their own assigned employees' });
-    }
+
 
     const data: any = {};
     if (name) data.name = name;
     if (email) data.email = email;
     if (status) data.status = status;
-    if (managerId !== undefined) data.managerId = managerId ? parseInt(managerId) : null;
+
     if (password) {
       data.password = await bcrypt.hash(password, 10);
     }
@@ -165,7 +135,6 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
         email: true,
         name: true,
         role: true,
-        managerId: true,
         status: true
       }
     });

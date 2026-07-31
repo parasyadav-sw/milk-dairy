@@ -12,7 +12,6 @@ export const calculateMilkRate = (fat: number, snf: number): number => {
 
 export const recordCollection = async (req: AuthRequest, res: Response) => {
   const {
-    visitId,
     date,
     timeOfDay,
     quantityLitres,
@@ -48,7 +47,6 @@ export const recordCollection = async (req: AuthRequest, res: Response) => {
 
     const collection = await prisma.milkCollection.create({
       data: {
-        visitId: visitId ? parseInt(visitId) : null,
         date,
         timeOfDay,
         quantityLitres: qty,
@@ -63,13 +61,7 @@ export const recordCollection = async (req: AuthRequest, res: Response) => {
       }
     });
 
-    // If there is an associated visit, mark it as completed
-    if (visitId) {
-      await prisma.visit.update({
-        where: { id: parseInt(visitId) },
-        data: { status: 'COMPLETED' }
-      });
-    }
+
 
     // Log action
     await prisma.auditLog.create({

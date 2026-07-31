@@ -12,22 +12,19 @@ import {
 } from 'recharts';
 
 export const AdminDashboard: React.FC = () => {
-  const { users, farmers, visits, collections, payments, auditLogs, addUser, updateUser } = useDatabase();
+  const { users, farmers, collections, payments, auditLogs, addUser, updateUser } = useDatabase();
   const { user: currentAdmin } = useAuth();
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'ADMIN' | 'MANAGER' | 'EMPLOYEE'>('EMPLOYEE');
-  const [managerId, setManagerId] = useState<string>('');
+  const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE'>('EMPLOYEE');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const managersCount = users.filter(u => u.role === 'MANAGER').length;
+
   const employeesCount = users.filter(u => u.role === 'EMPLOYEE').length;
   const farmersCount = farmers.length;
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayVisits = visits.filter(v => v.date === todayStr);
-  const todayCompletedVisitsCount = todayVisits.filter(v => v.status === 'COMPLETED').length;
   const todayMilkQuantity = collections.filter(c => c.date === todayStr).reduce((sum, col) => sum + col.quantityLitres, 0);
   const totalPaidRevenue = payments.reduce((sum, pay) => sum + pay.amount, 0);
   const pendingPayoutAmount = collections.filter(c => c.paymentStatus === 'PENDING').reduce((sum, col) => sum + col.totalAmount, 0);
@@ -45,11 +42,11 @@ export const AdminDashboard: React.FC = () => {
   collections.forEach(col => { const name = col.collectedByName || `User #${col.collectedById}`; employeePerfMap[name] = (employeePerfMap[name] || 0) + col.quantityLitres; });
   const employeePerfData = Object.entries(employeePerfMap).map(([name, litres]) => ({ name, litres: Math.round(litres * 10) / 10 })).sort((a, b) => b.litres - a.litres).slice(0, 5);
 
-  const handleOpenAddUser = () => { setEditingUser(null); setName(''); setEmail(''); setPassword(''); setRole('EMPLOYEE'); setManagerId(''); setError(null); setSuccess(null); setShowUserModal(true); };
-  const handleOpenEditUser = (u: any) => { setEditingUser(u); setName(u.name); setEmail(u.email); setPassword(''); setRole(u.role); setManagerId(u.managerId ? String(u.managerId) : ''); setError(null); setSuccess(null); setShowUserModal(true); };
+  const handleOpenAddUser = () => { setEditingUser(null); setName(''); setEmail(''); setPassword(''); setRole('EMPLOYEE'); setError(null); setSuccess(null); setShowUserModal(true); };
+  const handleOpenEditUser = (u: any) => { setEditingUser(u); setName(u.name); setEmail(u.email); setPassword(''); setRole(u.role); setError(null); setSuccess(null); setShowUserModal(true); };
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault(); setError(null); setSuccess(null);
-    const userData: any = { name, email, role, managerId: role === 'EMPLOYEE' && managerId ? parseInt(managerId) : null };
+    const userData: any = { name, email, role };
     if (password) userData.password = password;
     try {
       if (editingUser) { await updateUser(editingUser.id, userData); setSuccess('User updated successfully'); }
@@ -60,11 +57,9 @@ export const AdminDashboard: React.FC = () => {
   const handleToggleStatus = async (targetUser: any) => { try { await updateUser(targetUser.id, { status: targetUser.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' }); } catch (err: any) { alert('Failed: ' + err.message); } };
 
   const stats = [
-    { label: 'Managers', value: managersCount, icon: <Shield className="w-5 h-5" />, bg: 'bg-primary-50', fg: 'text-primary-700' },
     { label: 'Field agents', value: employeesCount, icon: <Users className="w-5 h-5" />, bg: 'bg-warm-100', fg: 'text-warm-700' },
-    { label: 'Farmers', value: farmersCount, icon: <UserCheck className="w-5 h-5" />, bg: 'bg-gold-50', fg: 'text-gold-600' },
+    { label: 'Customers', value: farmersCount, icon: <UserCheck className="w-5 h-5" />, bg: 'bg-gold-50', fg: 'text-gold-600' },
     { label: "Today's milk", value: `${todayMilkQuantity.toFixed(1)} L`, icon: <Milk className="w-5 h-5" />, bg: 'bg-primary-50', fg: 'text-primary-700' },
-    { label: "Today's visits", value: `${todayCompletedVisitsCount}/${todayVisits.length}`, icon: <Calendar className="w-5 h-5" />, bg: 'bg-warm-100', fg: 'text-warm-700' },
     { label: 'Total payouts', value: `₹${totalPaidRevenue.toLocaleString()}`, icon: <Landmark className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
     { label: 'Pending due', value: `₹${pendingPayoutAmount.toLocaleString()}`, icon: <Coins className="w-5 h-5" />, bg: 'bg-red-50', fg: 'text-error' },
     { label: 'System', value: 'Online', icon: <CheckCircle className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
@@ -132,7 +127,6 @@ export const AdminDashboard: React.FC = () => {
               <th className="table-header th">Name</th>
               <th className="table-header th">Email</th>
               <th className="table-header th">Role</th>
-              <th className="table-header th">Manager</th>
               <th className="table-header th text-center">Status</th>
               <th className="table-header th text-right">Actions</th>
             </tr></thead>
@@ -140,8 +134,7 @@ export const AdminDashboard: React.FC = () => {
               <tr key={u.id} className="table-row">
                 <td className="table-cell font-medium text-foreground">{u.name}</td>
                 <td className="table-cell text-muted font-mono text-body-sm">{u.email}</td>
-                <td className="table-cell"><span className={`badge ${u.role === 'ADMIN' ? 'bg-primary-50 text-primary-700 border border-primary-200/60' : u.role === 'MANAGER' ? 'bg-warm-100 text-warm-700 border border-warm-200/60' : 'bg-forest-50 text-forest-700 border border-forest-200/60'}`}>{u.role}</span></td>
-                <td className="table-cell text-muted text-body-sm">{u.role === 'EMPLOYEE' ? (u.managerName || 'Unassigned') : '—'}</td>
+                <td className="table-cell"><span className={`badge ${u.role === 'ADMIN' ? 'bg-primary-50 text-primary-700 border border-primary-200/60' : 'bg-forest-50 text-forest-700 border border-forest-200/60'}`}>{u.role}</span></td>
                 <td className="table-cell text-center"><button onClick={() => handleToggleStatus(u)} className="inline-flex items-center gap-1 cursor-pointer">{u.status === 'ACTIVE' ? <span className="badge badge-success"><ToggleRight className="w-3.5 h-3.5" /> Active</span> : <span className="badge badge-neutral"><ToggleLeft className="w-3.5 h-3.5" /> Inactive</span>}</button></td>
                 <td className="table-cell text-right"><button onClick={() => handleOpenEditUser(u)} className="btn-icon"><Edit className="w-4 h-4" /></button></td>
               </tr>
@@ -173,8 +166,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="space-y-2"><label className="label">Full name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input" /></div>
               <div className="space-y-2"><label className="label">Email</label><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" /></div>
               {!editingUser && <div className="space-y-2"><label className="label">Password</label><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input" /></div>}
-              <div className="space-y-2"><label className="label">Role</label><select value={role} onChange={(e: any) => setRole(e.target.value)} className="select"><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="ADMIN">Admin</option></select></div>
-              {role === 'EMPLOYEE' && <div className="space-y-2"><label className="label">Manager</label><select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="select"><option value="">Unassigned</option>{users.filter(u => u.role === 'MANAGER').map(mgr => <option key={mgr.id} value={mgr.id}>{mgr.name}</option>)}</select></div>}
+              <div className="space-y-2"><label className="label">Role</label><select value={role} onChange={(e: any) => setRole(e.target.value)} className="select"><option value="EMPLOYEE">Employee</option><option value="ADMIN">Admin</option></select></div>
               <div className="flex gap-3 justify-end pt-4 border-t border-warm-100"><button type="button" onClick={() => setShowUserModal(false)} className="btn-ghost">Cancel</button><button type="submit" className="btn-primary">{editingUser ? 'Save changes' : 'Create user'}</button></div>
             </form>
           </div>
