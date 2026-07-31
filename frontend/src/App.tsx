@@ -6,10 +6,14 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { DashboardDispatcher } from './pages/DashboardDispatcher';
 import { Customers } from './pages/Customers';
-
-import { Payments } from './pages/Payments';
+import { Employees } from './pages/Employees';
 import { Attendance } from './pages/Attendance';
 import { Reports } from './pages/Reports';
+import { Surveys } from './pages/Surveys';
+import { NewSurvey } from './pages/NewSurvey';
+import { Export } from './pages/Export';
+import { Profile } from './pages/Profile';
+import { Settings } from './pages/Settings';
 
 // Route Guard to verify active JWT sessions
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -81,13 +85,11 @@ export default function App() {
               } 
             />
 
-
-
             <Route 
-              path="/payments" 
+              path="/employees" 
               element={
                 <ProtectedRoute>
-                  <Payments />
+                  <Employees />
                 </ProtectedRoute>
               } 
             />
@@ -106,6 +108,51 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Reports />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/surveys" 
+              element={
+                <ProtectedRoute>
+                  <Surveys />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/new-survey" 
+              element={
+                <ProtectedRoute>
+                  <NewSurvey />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/export" 
+              element={
+                <ProtectedRoute>
+                  <Export />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               } 
             />

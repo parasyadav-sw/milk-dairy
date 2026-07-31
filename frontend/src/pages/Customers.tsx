@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft, Milk } from 'lucide-react';
+import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft, Milk, Trash2 } from 'lucide-react';
 import { Toast } from '../components/Toast';
 
 export const Customers: React.FC = () => {
-  const { farmers, addFarmer, updateFarmer, collections } = useDatabase();
+  const { farmers, addFarmer, updateFarmer, deleteFarmer, collections } = useDatabase();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [villageFilter, setVillageFilter] = useState('');
@@ -19,11 +19,24 @@ export const Customers: React.FC = () => {
   const [cowMilkYield, setCowMilkYield] = useState(''); const [buffaloMilkYield, setBuffaloMilkYield] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [selectedFarmer, setSelectedFarmer] = useState<any | null>(null);
+  const [deletingFarmer, setDeletingFarmer] = useState<any | null>(null);
   const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); };
 
   const resetForm = () => { setName(''); setMobile(''); setAltMobile(''); setGender('MALE'); setAge(''); setAadhaar(''); setVillage(''); setTaluka(''); setDistrict(''); setAddress(''); setAnimalType('COW'); setCowCount(''); setBuffaloCount(''); setCowMilkYield(''); setBuffaloMilkYield(''); };
   const handleOpenAdd = () => { setEditingFarmer(null); resetForm(); setShowModal(true); };
   const handleOpenEdit = (f: any) => { setEditingFarmer(f); setName(f.name); setMobile(f.mobile); setAltMobile(f.altMobile || ''); setGender(f.gender); setAge(String(f.age)); setAadhaar(f.aadhaar || ''); setVillage(f.village); setTaluka(f.taluka); setDistrict(f.district); setAddress(f.address); setAnimalType(f.animalType); setCowCount(String(f.cowCount)); setBuffaloCount(String(f.buffaloCount)); setCowMilkYield(f.cowMilkYield ? String(f.cowMilkYield) : ''); setBuffaloMilkYield(f.buffaloMilkYield ? String(f.buffaloMilkYield) : ''); setShowModal(true); };
+
+  const handleDelete = async () => {
+    if (!deletingFarmer) return;
+    try {
+      await deleteFarmer(deletingFarmer.id);
+      triggerToast('Customer deleted successfully');
+      setDeletingFarmer(null);
+      setSelectedFarmer(null);
+    } catch (err) {
+      triggerToast('Failed to delete customer', 'error');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +89,12 @@ export const Customers: React.FC = () => {
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="font-medium text-foreground text-body">{f.name}</h3>
                   <span className="label text-muted font-mono">{f.id}</span>
-                  {user?.role === 'EMPLOYEE' && <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(f); }} className="btn-icon ml-auto"><Edit className="w-4 h-4" /></button>}
+                  {user?.role === 'EMPLOYEE' && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(f); }} className="btn-icon"><Edit className="w-4 h-4" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeletingFarmer(f); }} className="btn-icon text-error hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-body-sm text-muted">
                   <span className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {f.mobile}</span>
@@ -217,6 +235,30 @@ export const Customers: React.FC = () => {
                     {selectedFarmer.buffaloMilkYield > 0 && <span className="text-body-xs text-primary-600 block mt-1">{selectedFarmer.buffaloMilkYield} L</span>}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingFarmer && (
+        <div className="modal-backdrop" onClick={() => setDeletingFarmer(null)}>
+          <div className="modal-content max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Delete customer?</h3>
+              <p className="text-body-sm text-muted mb-6">
+                Are you sure you want to delete <strong>{deletingFarmer.name}</strong>? This will also remove all their milk collection records.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setDeletingFarmer(null)} className="btn-ghost px-6">
+                  Cancel
+                </button>
+                <button onClick={handleDelete} className="btn-primary bg-red-600 hover:bg-red-700 px-6">
+                  Delete
+                </button>
               </div>
             </div>
           </div>

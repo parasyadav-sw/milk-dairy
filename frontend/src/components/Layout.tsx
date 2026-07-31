@@ -3,9 +3,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDatabase } from '../context/DatabaseContext';
 import { 
-  Milk, LayoutDashboard, Users, Milestone, 
+  Milk, LayoutDashboard, Users, 
   CalendarCheck, ClipboardList, LogOut, Database, UserCheck, 
-  FileText, ChevronRight, Menu, X
+  FileText, ChevronRight, Menu, X, PlusCircle, Download, User, Settings
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -42,11 +42,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const getNavLinks = () => {
     const links = [
-      { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/payments', label: 'Payments', icon: <Milestone className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER'] },
-      { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
-      { path: '/reports', label: 'Reports', icon: <FileText className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
+      { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/new-survey', label: 'New Survey', icon: <PlusCircle className="w-[18px] h-[18px]" />, roles: ['EMPLOYEE'] },
+      { path: '/employees', label: 'Employees', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
+      { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/surveys', label: 'Surveys', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
+      { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/reports', label: 'Reports', icon: <FileText className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
+      { path: '/export', label: 'Export', icon: <Download className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
+      { path: '/profile', label: 'Profile', icon: <User className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/settings', label: 'Settings', icon: <Settings className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
     ];
     return links.filter(l => user && l.roles.includes(user.role));
   };

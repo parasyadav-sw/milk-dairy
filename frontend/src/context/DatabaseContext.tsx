@@ -34,6 +34,8 @@ export interface Farmer {
   registeredById: number;
   registeredByName?: string;
   createdAt: string;
+  surveyDate?: string;
+  notes?: string;
 }
 
 
@@ -101,6 +103,23 @@ export interface AuditLog {
   timestamp: string;
 }
 
+export interface Survey {
+  id: number;
+  customerName: string;
+  mobile: string;
+  village: string;
+  address: string;
+  animals: Array<{ type: 'COW' | 'BUFFALO'; count: number; milkPerAnimal: number }>;
+  totalAnimals: number;
+  totalMilkProduction: number;
+  interested: boolean;
+  remarks?: string;
+  employeeId: number;
+  employeeName?: string;
+  surveyDate: string;
+  createdAt?: string;
+}
+
 interface DatabaseContextType {
   isApiMode: boolean;
   setApiMode: (val: boolean) => void;
@@ -111,19 +130,23 @@ interface DatabaseContextType {
   attendance: Attendance[];
   leaves: Leave[];
   auditLogs: AuditLog[];
+  surveys: Survey[];
   refreshData: () => Promise<void>;
   
   // Mutating Operations
   addUser: (data: Partial<User> & { password?: string }) => Promise<User>;
-  updateUser: (id: number, data: Partial<User>) => Promise<User>;
+  updateUser: (id: number, data: Partial<User> & { password?: string }) => Promise<User>;
+  deleteUser: (id: number) => Promise<void>;
   addFarmer: (data: Partial<Farmer>) => Promise<Farmer>;
   updateFarmer: (id: string, data: Partial<Farmer>) => Promise<Farmer>;
+  deleteFarmer: (id: string) => Promise<void>;
   recordMilk: (data: Partial<MilkCollection>) => Promise<MilkCollection>;
   processPayment: (farmerId: string, txnRef?: string) => Promise<Payment>;
   clockIn: (userId: number) => Promise<Attendance>;
   clockOut: (userId: number) => Promise<Attendance>;
   applyLeave: (userId: number, startDate: string, endDate: string, reason: string) => Promise<Leave>;
   approveRejectLeave: (leaveId: number, status: 'APPROVED' | 'REJECTED', approverId: number) => Promise<Leave>;
+  addSurvey: (data: Partial<Survey>) => Promise<Survey>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -146,6 +169,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [surveys, setSurveys] = useState<Survey[]>([]);
 
   // Seed Mock Data if not present in LocalStorage
   useEffect(() => {
@@ -405,6 +429,45 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         { id: 1, userName: 'System Admin', action: 'SYSTEM_INIT', details: 'Database seeded with default mock data', timestamp: new Date().toISOString() }
       ];
 
+      const initialSurveys: Survey[] = [
+        {
+          id: 1,
+          customerName: "Harish Choudhary",
+          mobile: "9876543210",
+          village: "Rajpura",
+          address: "Plot 4, Near Temple, Rajpura",
+          animals: [
+            { type: 'COW', count: 5, milkPerAnimal: 6.5 }
+          ],
+          totalAnimals: 5,
+          totalMilkProduction: 32.5,
+          interested: true,
+          remarks: "Wants to expand dairy collection",
+          employeeId: 4,
+          employeeName: "Amit Patel (Field Agent)",
+          surveyDate: "2026-07-28",
+          createdAt: "2026-07-28T10:00:00.000Z"
+        },
+        {
+          id: 2,
+          customerName: "Ram Niwas",
+          mobile: "9988776655",
+          village: "Rajpura",
+          address: "House 12, Main Road, Rajpura",
+          animals: [
+            { type: 'BUFFALO', count: 4, milkPerAnimal: 8.0 }
+          ],
+          totalAnimals: 4,
+          totalMilkProduction: 32.0,
+          interested: false,
+          remarks: "Happy with existing cooperative",
+          employeeId: 4,
+          employeeName: "Amit Patel (Field Agent)",
+          surveyDate: "2026-07-29",
+          createdAt: "2026-07-29T11:00:00.000Z"
+        }
+      ];
+
       localStorage.setItem('users', JSON.stringify(initialUsers));
       localStorage.setItem('farmers', JSON.stringify(initialFarmers));
       localStorage.setItem('collections', JSON.stringify(initialCollections));
@@ -412,6 +475,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem('attendance', JSON.stringify(initialAttendance));
       localStorage.setItem('leaves', JSON.stringify(initialLeaves));
       localStorage.setItem('auditLogs', JSON.stringify(initialAuditLogs));
+      localStorage.setItem('surveys', JSON.stringify(initialSurveys));
       localStorage.setItem('mock_seeded', 'true');
     }
 
@@ -425,14 +489,15 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       try {
-        const [uRes, fRes, cRes, pRes, aRes, lRes, logRes] = await Promise.all([
+        const [uRes, fRes, cRes, pRes, aRes, lRes, logRes, sRes] = await Promise.all([
           fetch('/api/users', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/farmers', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/collections', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/payments', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/attendance', { headers }).then(r => r.ok ? r.json() : []),
           fetch('/api/leaves', { headers }).then(r => r.ok ? r.json() : []),
-          fetch('/api/reports/audit-logs', { headers }).then(r => r.ok ? r.json() : [])
+          fetch('/api/reports/audit-logs', { headers }).then(r => r.ok ? r.json() : []),
+          fetch('/api/surveys', { headers }).then(r => r.ok ? r.json() : [])
         ]);
 
         setUsers(uRes);
@@ -442,6 +507,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setAttendance(aRes);
         setLeaves(lRes);
         setAuditLogs(logRes);
+        setSurveys(sRes);
       } catch (err) {
         console.error('API load failed, falling back to LocalStorage', err);
         loadLocalStorage();
@@ -459,6 +525,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAttendance(JSON.parse(localStorage.getItem('attendance') || '[]'));
     setLeaves(JSON.parse(localStorage.getItem('leaves') || '[]'));
     setAuditLogs(JSON.parse(localStorage.getItem('auditLogs') || '[]'));
+    setSurveys(JSON.parse(localStorage.getItem('surveys') || '[]'));
   };
 
   // --- MUTATING API / MOCK ACTIONS ---
@@ -500,7 +567,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const updateUser = async (id: number, data: Partial<User>) => {
+  const updateUser = async (id: number, data: Partial<User> & { password?: string }) => {
     const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
     if (isApiMode) {
       const res = await fetch(`/api/users/${id}`, {
@@ -525,6 +592,26 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       logAudit(creator.name, 'UPDATE_USER', `Updated user details for ${localUsers[idx].name}`);
       loadLocalStorage();
       return localUsers[idx];
+    }
+  };
+
+  const deleteUser = async (id: number) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('dairy_token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to delete user');
+      await refreshData();
+    } else {
+      const localUsers = JSON.parse(localStorage.getItem('users') || '[]') as User[];
+      const target = localUsers.find(u => u.id === id);
+      if (!target) throw new Error('User not found');
+      const updated = localUsers.filter(u => u.id !== id);
+      localStorage.setItem('users', JSON.stringify(updated));
+      logAudit(creator.name, 'DELETE_USER', `Deleted employee ${target.name}`);
+      loadLocalStorage();
     }
   };
 
@@ -616,6 +703,26 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       logAudit(creator.name, 'UPDATE_FARMER', `Updated farmer profile ${localFarmers[idx].name}`);
       loadLocalStorage();
       return localFarmers[idx];
+    }
+  };
+
+  const deleteFarmer = async (id: string) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch(`/api/farmers/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('dairy_token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to delete farmer');
+      await refreshData();
+    } else {
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      const target = localFarmers.find(f => f.id === id);
+      if (!target) throw new Error('Farmer not found');
+      const updated = localFarmers.filter(f => f.id !== id);
+      localStorage.setItem('farmers', JSON.stringify(updated));
+      logAudit(creator.name, 'DELETE_FARMER', `Deleted customer ${target.name}`);
+      loadLocalStorage();
     }
   };
 
@@ -905,6 +1012,130 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const addSurvey = async (data: Partial<Survey>) => {
+    const creator = JSON.parse(localStorage.getItem('dairy_user') || '{}');
+    if (isApiMode) {
+      const res = await fetch('/api/surveys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('dairy_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to submit survey');
+      const newSurvey = await res.json();
+      await refreshData();
+      return newSurvey;
+    } else {
+      const localSurveys = JSON.parse(localStorage.getItem('surveys') || '[]') as Survey[];
+      const localFarmers = JSON.parse(localStorage.getItem('farmers') || '[]') as Farmer[];
+      
+      const nextId = localSurveys.reduce((max: number, s: any) => s.id > max ? s.id : max, 0) + 1;
+      const todayDate = data.surveyDate || new Date().toISOString().split('T')[0];
+      
+      const newSurvey: Survey = {
+        id: nextId,
+        customerName: data.customerName || '',
+        mobile: data.mobile || '',
+        village: data.village || '',
+        address: data.address || '',
+        animals: data.animals || [],
+        totalAnimals: Number(data.totalAnimals) || 0,
+        totalMilkProduction: Number(data.totalMilkProduction) || 0,
+        interested: !!data.interested,
+        remarks: data.remarks || '',
+        employeeId: creator.id || 4,
+        employeeName: creator.name || 'Field Agent',
+        surveyDate: todayDate,
+        createdAt: new Date().toISOString()
+      };
+      
+      localSurveys.unshift(newSurvey);
+      localStorage.setItem('surveys', JSON.stringify(localSurveys));
+      
+      // Calculate cow/buffalo counts for farmer
+      let cowCount = 0;
+      let buffaloCount = 0;
+      let cowMilkYieldTotal = 0;
+      let buffaloMilkYieldTotal = 0;
+      let cowCountForYield = 0;
+      let buffaloCountForYield = 0;
+
+      newSurvey.animals.forEach(item => {
+        const count = parseInt(item.count as any) || 0;
+        const yieldVal = parseFloat(item.milkPerAnimal as any) || 0;
+        if (item.type === 'COW') {
+          cowCount += count;
+          cowMilkYieldTotal += yieldVal * count;
+          cowCountForYield += count;
+        } else if (item.type === 'BUFFALO') {
+          buffaloCount += count;
+          buffaloMilkYieldTotal += yieldVal * count;
+          buffaloCountForYield += count;
+        }
+      });
+      
+      const finalCowMilkYield = cowCountForYield > 0 ? (cowMilkYieldTotal / cowCountForYield) : 0;
+      const finalBuffaloMilkYield = buffaloCountForYield > 0 ? (buffaloMilkYieldTotal / buffaloCountForYield) : 0;
+
+      let animalType = 'COW';
+      if (cowCount > 0 && buffaloCount > 0) {
+        animalType = 'BOTH';
+      } else if (buffaloCount > 0) {
+        animalType = 'BUFFALO';
+      }
+
+      // Check if farmer exists
+      const fIdx = localFarmers.findIndex(f => f.mobile === newSurvey.mobile);
+      if (fIdx !== -1) {
+        localFarmers[fIdx] = {
+          ...localFarmers[fIdx],
+          name: newSurvey.customerName,
+          village: newSurvey.village,
+          address: newSurvey.address,
+          animalType,
+          cowCount,
+          buffaloCount,
+          totalAnimals: cowCount + buffaloCount,
+          cowMilkYield: finalCowMilkYield,
+          buffaloMilkYield: finalBuffaloMilkYield,
+          surveyDate: todayDate,
+          notes: newSurvey.remarks
+        };
+      } else {
+        const farmerId = `FMR-${String(localFarmers.length + 1).padStart(4, '0')}`;
+        localFarmers.push({
+          id: farmerId,
+          name: newSurvey.customerName,
+          mobile: newSurvey.mobile,
+          gender: 'MALE',
+          age: 30,
+          village: newSurvey.village,
+          taluka: 'Jaipur',
+          district: 'Jaipur',
+          address: newSurvey.address,
+          animalType,
+          cowCount,
+          buffaloCount,
+          totalAnimals: cowCount + buffaloCount,
+          cowMilkYield: finalCowMilkYield,
+          buffaloMilkYield: finalBuffaloMilkYield,
+          registeredById: creator.id || 4,
+          registeredByName: creator.name || 'Field Agent',
+          createdAt: new Date().toISOString(),
+          surveyDate: todayDate,
+          notes: newSurvey.remarks
+        });
+      }
+      
+      localStorage.setItem('farmers', JSON.stringify(localFarmers));
+      logAudit(creator.name || 'Agent', 'SUBMIT_SURVEY', `Submitted survey for customer ${newSurvey.customerName}`);
+      loadLocalStorage();
+      return newSurvey;
+    }
+  };
+
   // Helper to log audit events locally
   const logAudit = (name: string, action: string, details: string) => {
     const localLogs = JSON.parse(localStorage.getItem('auditLogs') || '[]') as AuditLog[];
@@ -930,17 +1161,21 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       attendance,
       leaves,
       auditLogs,
+      surveys,
       refreshData,
       addUser,
       updateUser,
+      deleteUser,
       addFarmer,
       updateFarmer,
+      deleteFarmer,
       recordMilk,
       processPayment,
       clockIn,
       clockOut,
       applyLeave,
-      approveRejectLeave
+      approveRejectLeave,
+      addSurvey
     }}>
       {children}
     </DatabaseContext.Provider>
