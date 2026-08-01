@@ -43,19 +43,7 @@ export const Login: React.FC = () => {
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        <div className="mb-6 flex items-center justify-between p-3 bg-white rounded-2xl border border-warm-200 shadow-soft text-body-sm font-medium">
-          <span className="flex items-center gap-2 text-muted">
-            <Database className="w-4 h-4 text-primary-600" />
-            {isApiMode ? 'PostgreSQL server' : 'Browser sandbox'}
-          </span>
-          <button
-            type="button"
-            onClick={() => { setApiMode(!isApiMode); setLocalErr(null); clearError(); }}
-            className="text-primary-700 hover:text-primary-800 font-semibold transition-colors"
-          >
-            Switch to {isApiMode ? 'Local demo' : 'API server'}
-          </button>
-        </div>
+
 
         <div className="bg-white rounded-3xl shadow-soft-xl border border-warm-200 overflow-hidden">
           <div className="p-8 md:p-10">
@@ -108,17 +96,7 @@ export const Login: React.FC = () => {
             </form>
           </div>
 
-          {!isApiMode && (
-            <div className="px-8 md:px-10 py-6 bg-warm-50/50 border-t border-warm-100">
-              <span className="label text-muted flex items-center gap-1.5 justify-center mb-3">
-                <UserCheck className="w-3 h-3 text-gold-500" /> Quick access (demo)
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => fillCredentials('Ramesh', 'admin123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Admin</button>
-                <button type="button" onClick={() => fillCredentials('Amit', 'employee123')} className="px-3 py-2.5 bg-white hover:bg-warm-100 border border-warm-200 rounded-xl text-body-sm font-medium text-warm-700 transition-all duration-200 hover:shadow-soft">Employee</button>
-              </div>
-            </div>
-          )}
+
         </div>
 
         <p className="text-center text-caption text-muted mt-6">Dairy Suite Enterprise v2.0 — Secure portal</p>

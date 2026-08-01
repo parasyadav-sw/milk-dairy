@@ -32,9 +32,8 @@ export const AdminDashboard: React.FC = () => {
 
   const last7Days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0]; }).reverse();
   const dailyTrendData = last7Days.map(date => {
-    const dayCols = collections.filter(c => c.date === date);
-    const litres = dayCols.reduce((sum, c) => sum + c.quantityLitres, 0);
-    return { date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }), litres: Math.round(litres * 10) / 10 };
+    const daySurveys = surveys.filter(s => s.surveyDate === date);
+    return { date: new Date(date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }), surveys: daySurveys.length };
   });
 
   const COLORS = ['#2F5233', '#3a6643', '#4a7f54', '#6a9a71', '#8fb595'];
@@ -92,20 +91,20 @@ export const AdminDashboard: React.FC = () => {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="section-title">Weekly milk collection</h3>
-              <p className="section-subtitle mt-1">Daily milk yield in litres</p>
+              <h3 className="section-title">Weekly surveys done</h3>
+              <p className="section-subtitle mt-1">Daily surveys completed</p>
             </div>
             <span className="badge badge-info">Last 7 days</span>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={dailyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs><linearGradient id="colorLitres" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2F5233" stopOpacity={0.15}/><stop offset="95%" stopColor="#2F5233" stopOpacity={0}/></linearGradient></defs>
+                <defs><linearGradient id="colorSurveys" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2F5233" stopOpacity={0.15}/><stop offset="95%" stopColor="#2F5233" stopOpacity={0}/></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EBE0CF" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fontWeight: 500 }} stroke="#9B9A94" />
-                <YAxis tick={{ fontSize: 11, fontWeight: 500 }} stroke="#9B9A94" />
+                <YAxis tick={{ fontSize: 11, fontWeight: 500 }} stroke="#9B9A94" allowDecimals={false} />
                 <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #EBE0CF', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: '13px', fontFamily: 'Inter' }} />
-                <Area type="monotone" dataKey="litres" stroke="#2F5233" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLitres)" name="Litres" />
+                <Area type="monotone" dataKey="surveys" stroke="#2F5233" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSurveys)" name="Surveys" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -5,7 +5,7 @@ import { useDatabase } from '../context/DatabaseContext';
 import { 
   Milk, LayoutDashboard, Users, 
   CalendarCheck, ClipboardList, LogOut, Database, UserCheck, 
-  FileText, ChevronRight, Menu, X, PlusCircle, Download, User, Settings
+  ChevronRight, Menu, X, PlusCircle, Download, User
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -48,10 +48,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/surveys', label: 'Surveys', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
-      { path: '/reports', label: 'Reports', icon: <FileText className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/export', label: 'Export', icon: <Download className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/profile', label: 'Profile', icon: <User className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
-      { path: '/settings', label: 'Settings', icon: <Settings className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
     ];
     return links.filter(l => user && l.roles.includes(user.role));
   };
@@ -107,38 +105,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       <div className="p-3 border-t border-warm-100 space-y-2">
-        {!isApiMode && (
-          <div className="p-2.5 bg-warm-50 rounded-xl border border-warm-100">
-            <label className="label text-primary-700 flex items-center gap-1.5 mb-1.5">
-              <UserCheck className="w-3 h-3" /> Demo mode
-            </label>
-            <select
-              value={user?.username || ''}
-              onChange={handleRoleSimulation}
-              className="w-full bg-white border border-warm-200 rounded-lg text-body-sm font-medium px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
-            >
-              <option value="Ramesh">Admin: Ramesh</option>
-              <option value="Amit">Employee: Amit</option>
-            </select>
-          </div>
-        )}
-
-        <button
-          onClick={() => {
-            const newMode = !isApiMode;
-            setApiMode(newMode);
-            logout();
-            navigate('/login');
-          }}
-          className="flex items-center justify-between w-full px-3 py-2 rounded-xl text-body-sm font-medium bg-white border border-warm-200 hover:bg-warm-50 transition-all duration-200"
-        >
-          <span className="flex items-center gap-2 text-warm-600">
-            <Database className="w-4 h-4 text-primary-600" />
-            {isApiMode ? 'API server' : 'Local demo'}
-          </span>
-          <span className={`w-2 h-2 rounded-full ${isApiMode ? 'bg-forest-500 animate-pulse' : 'bg-forest-400'}`} />
-        </button>
-
         <button
           onClick={logout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-body-sm font-medium text-error hover:bg-red-50 transition-all duration-200"
@@ -158,7 +124,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="absolute inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute inset-0 bg-black/25 backdrop-blur-md" onClick={() => setMobileOpen(false)} />
           <div className="relative flex flex-col w-[280px] bg-white shadow-soft-xl animate-slide-in-left">
             <SidebarContent isMobile />
           </div>
@@ -181,11 +147,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
               <ChevronRight className="w-3.5 h-3.5 text-warm-300" />
               <span className="font-medium text-foreground">{currentPageLabel}</span>
-            </div>
-
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-warm-50 rounded-lg text-label text-muted border border-warm-100">
-              <span className={`w-1.5 h-1.5 rounded-full ${isApiMode ? 'bg-forest-500' : 'bg-forest-400'}`} />
-              {isApiMode ? 'PostgreSQL' : 'Browser DB'}
             </div>
           </div>
 

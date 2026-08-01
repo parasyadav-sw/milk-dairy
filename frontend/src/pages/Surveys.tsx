@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
-import { Search, ClipboardList, ShieldAlert, Calendar, User, Eye, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, ClipboardList, ShieldAlert, Calendar, User, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 
 export const Surveys: React.FC = () => {
   const { surveys, users } = useDatabase();
@@ -99,14 +99,17 @@ export const Surveys: React.FC = () => {
                   <th className="table-header th">Yield (L/day)</th>
                   <th className="table-header th">Surveyed By</th>
                   <th className="table-header th">Date</th>
-                  <th className="table-header th text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSurveys.map(s => {
                   const empName = s.employeeName || users.find(u => u.id === s.employeeId)?.name || `Agent #${s.employeeId}`;
                   return (
-                    <tr key={s.id} className="table-row">
+                    <tr 
+                      key={s.id} 
+                      onClick={() => setSelectedSurvey(s)} 
+                      className="table-row cursor-pointer"
+                    >
                       <td className="table-cell">
                         <div>
                           <p className="font-semibold text-foreground">{s.customerName}</p>
@@ -127,14 +130,6 @@ export const Surveys: React.FC = () => {
                           <Calendar className="w-3.5 h-3.5" />
                           {s.surveyDate.split('-').reverse().join('/')}
                         </span>
-                      </td>
-                      <td className="table-cell text-right">
-                        <button 
-                          onClick={() => setSelectedSurvey(s)} 
-                          className="btn-icon hover:text-primary-700"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
                       </td>
                     </tr>
                   );

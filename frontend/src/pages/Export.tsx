@@ -21,7 +21,7 @@ export const Export: React.FC = () => {
   const [globalVillage, setGlobalVillage] = useState(() => getSessionValue('r_globalVillage', ''));
   const [globalAnimalType, setGlobalAnimalType] = useState(() => getSessionValue('r_globalAnimalType', 'ALL'));
   const [globalStatus, setGlobalStatus] = useState(() => getSessionValue('r_globalStatus', 'ALL'));
-  const [globalSortBy, setGlobalSortBy] = useState(() => getSessionValue('r_globalSortBy', 'newest'));
+  const [globalSortBy, setGlobalSortBy] = useState(() => getSessionValue('r_globalSortBy', 'id_asc'));
   const [globalExportFormat, setGlobalExportFormat] = useState(() => getSessionValue('r_globalExportFormat', 'ALL'));
 
   // Collapsible settings
@@ -140,7 +140,7 @@ export const Export: React.FC = () => {
     setGlobalVillage('');
     setGlobalAnimalType('ALL');
     setGlobalStatus('ALL');
-    setGlobalSortBy('newest');
+    setGlobalSortBy('id_asc');
     setGlobalExportFormat('ALL');
 
     setCustFarmerName('');
@@ -287,6 +287,8 @@ export const Export: React.FC = () => {
       result.sort((a, b) => a.name.localeCompare(b.name));
     } else if (globalSortBy === 'name_desc') {
       result.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (globalSortBy === 'id_asc') {
+      result.sort((a, b) => a.id.localeCompare(b.id));
     }
 
     return result;
@@ -356,6 +358,8 @@ export const Export: React.FC = () => {
       result.sort((a, b) => a.name.localeCompare(b.name));
     } else if (globalSortBy === 'name_desc') {
       result.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (globalSortBy === 'id_asc') {
+      result.sort((a, b) => a.id - b.id);
     }
 
     return result;
@@ -455,6 +459,8 @@ export const Export: React.FC = () => {
       result.sort((a, b) => a.customerName.localeCompare(b.customerName));
     } else if (globalSortBy === 'name_desc') {
       result.sort((a, b) => b.customerName.localeCompare(a.customerName));
+    } else if (globalSortBy === 'id_asc') {
+      result.sort((a, b) => a.id - b.id);
     }
 
     return result;
@@ -549,6 +555,8 @@ export const Export: React.FC = () => {
         const bName = b.userName || users.find(u => u.id === b.userId)?.name || '';
         return bName.localeCompare(aName);
       });
+    } else if (globalSortBy === 'id_asc') {
+      result.sort((a, b) => a.id - b.id);
     }
 
     return result;
@@ -564,21 +572,24 @@ export const Export: React.FC = () => {
       filename = `Customer_Report_${Date.now()}`;
       pdfTitle = 'Registered Customers (Farmers) Report';
       headers = ['ID', 'Name', 'Mobile', 'Alt Mobile', 'Gender', 'Age', 'Aadhaar', 'Village', 'Taluka', 'District', 'Address', 'Animal Type', 'Cows', 'Buffalos', 'Total Animals', 'Cow Yield (L)', 'Buffalo Yield (L)', 'Survey Date', 'Notes'];
-      rows = filteredFarmers.map(f => [
+      const sortedFarmers = [...filteredFarmers].sort((a, b) => a.id.localeCompare(b.id));
+      rows = sortedFarmers.map(f => [
         f.id, f.name, f.mobile, f.altMobile || '', f.gender, f.age, f.aadhaar || '', f.village, f.taluka, f.district, f.address, f.animalType, f.cowCount, f.buffaloCount, f.totalAnimals, f.cowMilkYield || 0, f.buffaloMilkYield || 0, f.surveyDate || 'N/A', f.notes || ''
       ]);
     } else if (reportType === 'employees') {
       filename = `Employee_Report_${Date.now()}`;
       pdfTitle = 'Dairy Employees (Field Agents) Report';
       headers = ['ID', 'Name', 'Email', 'Role', 'Status', 'Joined Date'];
-      rows = filteredEmployees.map(u => [
+      const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
+      rows = sortedEmployees.map(u => [
         `EMP-${String(u.id).padStart(4, '0')}`, u.name, u.email, u.role, u.status, u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : 'N/A'
       ]);
     } else if (reportType === 'surveys') {
       filename = `Survey_Report_${Date.now()}`;
       pdfTitle = 'Dairy Field Survey Log Report';
       headers = ['Survey ID', 'Customer Name', 'Mobile', 'Village', 'Address', 'Total Animals', 'Total Milk (L/day)', 'Cooperative Interest', 'Remarks', 'Surveyed By', 'Survey Date'];
-      rows = filteredSurveys.map(s => {
+      const sortedSurveys = [...filteredSurveys].sort((a, b) => a.id - b.id);
+      rows = sortedSurveys.map(s => {
         const empName = s.employeeName || users.find(u => u.id === s.employeeId)?.name || `Agent #${s.employeeId}`;
         return [
           `SRV-${String(s.id).padStart(4, '0')}`, s.customerName, s.mobile, s.village, s.address, s.totalAnimals, s.totalMilkProduction, s.interested ? 'YES' : 'NO', s.remarks || '', empName, s.surveyDate
@@ -776,6 +787,7 @@ export const Export: React.FC = () => {
                 onChange={e => setGlobalSortBy(e.target.value)}
                 className="select w-full"
               >
+                <option value="id_asc">ID (FMR-0001 / EMP-0001)</option>
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
                 <option value="name_asc">Name A-Z</option>

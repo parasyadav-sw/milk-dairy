@@ -106,7 +106,7 @@ export const Employees: React.FC = () => {
     if (statusFilter) {
       list = list.filter(u => u.status === statusFilter);
     }
-    return list;
+    return [...list].sort((a, b) => b.id - a.id);
   }, [users, search, statusFilter]);
 
   const activeCount = users.filter(u => u.role === 'EMPLOYEE' && u.status === 'ACTIVE').length;

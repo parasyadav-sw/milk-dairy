@@ -145,11 +145,11 @@
   }
 
   .modal-backdrop {
-    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm animate-fade-in;
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in;
   }
   
   .modal-content {
-    @apply w-full bg-white rounded-3xl border border-warm-200 shadow-soft-xl p-6 md:p-8 animate-scale-in max-h-[90vh] overflow-y-auto;
+    @apply w-full max-w-2xl bg-white rounded-3xl border border-warm-200 shadow-soft-xl p-6 md:p-8 animate-scale-in max-h-[90vh] overflow-y-auto;
   }
 
   .empty-state {
@@ -266,5 +266,11 @@ html:has(.modal-backdrop) {
 
 body:has(.modal-backdrop) main {
   overflow: hidden !important;
+}
+
+/* Hide Microsoft Edge native password reveal button */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
 }
 
