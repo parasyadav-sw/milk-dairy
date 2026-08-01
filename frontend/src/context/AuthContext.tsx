@@ -64,8 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error('This account has been deactivated');
         }
 
-        const correctPassword = 
-          found.role === 'ADMIN' ? 'admin123' : 'employee123';
+        const correctPassword = found.password || (found.role === 'ADMIN' ? 'admin123' : 'employee123');
         
         if (password !== correctPassword && password !== 'password') {
           throw new Error('Invalid credentials');

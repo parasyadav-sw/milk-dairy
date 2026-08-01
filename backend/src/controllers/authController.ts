@@ -15,13 +15,14 @@ export const seedInitialAdmin = async () => {
       await prisma.user.create({
         data: {
           email: 'admin@dairy.com',
+          username: 'admin',
           password: hashedPassword,
           name: 'System Admin',
           role: 'ADMIN',
           status: 'ACTIVE'
         }
       });
-      console.log('Seeded default admin user: admin@dairy.com / admin123');
+      console.log('Seeded default admin user: admin@dairy.com / admin123 (username: admin)');
     }
   } catch (error) {
     console.error('Failed to seed default admin:', error);
@@ -29,26 +30,41 @@ export const seedInitialAdmin = async () => {
 };
 
 export const login = async (req: AuthRequest, res: Response) => {
-  const email = req.body.email || req.body.username;
+  const identifier = req.body.email || req.body.username;
   const { password } = req.body;
 
+  console.log(`[AUTH] Login attempt for identifier: "${identifier}"`);
+
   try {
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    if (!identifier || !password) {
+      console.log('[AUTH] Login failed: Missing identifier or password');
+      return res.status(400).json({ error: 'Email/username and password are required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Lookup user by email or username
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier }
+        ]
+      }
+    });
+
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      console.log(`[AUTH] Login failed: No user found matching identifier "${identifier}"`);
+      return res.status(401).json({ error: `Authentication failed: User "${identifier}" not found` });
     }
 
     if (user.status !== 'ACTIVE') {
+      console.log(`[AUTH] Login failed: User "${identifier}" is inactive (Status: ${user.status})`);
       return res.status(403).json({ error: 'Your account is deactivated' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      console.log(`[AUTH] Login failed: Incorrect password for user "${identifier}"`);
+      return res.status(401).json({ error: 'Authentication failed: Invalid password' });
     }
 
     const token = jwt.sign(
@@ -57,16 +73,20 @@ export const login = async (req: AuthRequest, res: Response) => {
       { expiresIn: '24h' }
     );
 
+    console.log(`[AUTH] Login successful for user: "${user.name}" (Role: ${user.role}, ID: ${user.id})`);
+
     res.json({
       token,
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         name: user.name,
         role: user.role
       }
     });
   } catch (error: any) {
+    console.error(`[AUTH] Error during login for identifier "${identifier}":`, error);
     res.status(500).json({ error: error.message });
   }
 };

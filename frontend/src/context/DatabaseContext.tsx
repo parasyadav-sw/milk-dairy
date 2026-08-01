@@ -172,9 +172,20 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [surveys, setSurveys] = useState<Survey[]>([]);
 
-  // Seed Mock Data if not present in LocalStorage
+  // Seed Mock Data if not present or outdated in LocalStorage
   useEffect(() => {
-    if (!localStorage.getItem('mock_seeded')) {
+    let hasUsers = false;
+    try {
+      const storedUsers = localStorage.getItem('users');
+      if (storedUsers) {
+        const parsed = JSON.parse(storedUsers);
+        hasUsers = Array.isArray(parsed) && parsed.length > 0 && parsed.every((u: any) => u.username);
+      }
+    } catch (e) {
+      hasUsers = false;
+    }
+
+    if (!localStorage.getItem('mock_seeded') || !hasUsers) {
       const initialUsers: User[] = [
         { id: 1, username: 'Ramesh', email: 'admin@dairy.com', name: 'Ramesh Kumar (Admin)', role: 'ADMIN', status: 'ACTIVE' },
         { id: 4, username: 'Amit', email: 'employee1@dairy.com', name: 'Amit Patel (Field Agent)', role: 'EMPLOYEE', status: 'ACTIVE' },
@@ -549,7 +560,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
       const nextId = localUsers.reduce((max: number, u: any) => u.id > max ? u.id : max, 0) + 1;
-      const newUser: User = {
+      const newUser: any = {
         id: nextId,
         username: data.username || '',
         email: data.email || '',
@@ -557,6 +568,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         role: data.role || 'EMPLOYEE',
         status: 'ACTIVE',
         managerId: null,
+        password: data.password || '',
         createdAt: new Date().toISOString()
       };
       localUsers.push(newUser);

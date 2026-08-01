@@ -49,13 +49,20 @@ export const Customers: React.FC = () => {
     } catch (err: any) { triggerToast(err.message || 'Failed', 'error'); }
   };
 
-  const filteredFarmers = farmers.filter(f => {
-    const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.id.toLowerCase().includes(search.toLowerCase()) || f.mobile.includes(search);
-    const matchesVillage = villageFilter === '' || f.village === villageFilter;
-    return matchesSearch && matchesVillage;
+  const myFarmers = farmers.filter(f => {
+    if (user?.role === 'EMPLOYEE' && f.registeredById !== user.id) return false;
+    return true;
   });
 
-  const uniqueVillages = Array.from(new Set(farmers.map(f => f.village)));
+  const filteredFarmers = myFarmers
+    .filter(f => {
+      const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.id.toLowerCase().includes(search.toLowerCase()) || f.mobile.includes(search);
+      const matchesVillage = villageFilter === '' || f.village === villageFilter;
+      return matchesSearch && matchesVillage;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const uniqueVillages = Array.from(new Set(myFarmers.map(f => f.village)));
 
   const getMilkTotal = (farmerId: string) => collections.filter(c => c.farmerId === farmerId).reduce((sum, c) => sum + c.quantityLitres, 0);
 

@@ -1,12 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, ShieldAlert, Clock, User, Filter, RotateCcw, Award, CheckCircle2, UserX, FileText } from 'lucide-react';
+import { Calendar, ShieldAlert, Clock, User, Filter, RotateCcw, Award, CheckCircle2, UserX, FileText, Timer } from 'lucide-react';
+import { Toast } from '../components/Toast';
 
 const today = new Date().toISOString().split('T')[0];
 
 export const Attendance: React.FC = () => {
-  const { attendance, users } = useDatabase();
+  const { attendance, users, clockIn, clockOut } = useDatabase();
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'history' | 'daily' | 'monthly'>('history');
@@ -15,6 +16,87 @@ export const Attendance: React.FC = () => {
   const [filterDate, setFilterDate] = useState(today);
   const [filterEmployee, setFilterEmployee] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  // Shift Timer & Toast for Employee view
+  const [timerVal, setTimerVal] = useState('00:00:00');
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  
+  const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+  };
+
+  const todayStr = today;
+  const myAttendanceToday = useMemo(() => {
+    return attendance.find(a => a.userId === user?.id && a.date === todayStr);
+  }, [attendance, user, todayStr]);
+
+  useEffect(() => {
+    if (user?.role !== 'EMPLOYEE' || !myAttendanceToday || !myAttendanceToday.clockIn || myAttendanceToday.clockOut) {
+      setTimerVal('00:00:00');
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const [h, m] = myAttendanceToday.clockIn!.split(':').map(Number);
+      const start = new Date();
+      start.setHours(h, m, 0, 0);
+      const diffMs = Date.now() - start.getTime();
+      
+      if (diffMs > 0) {
+        const diffSecs = Math.floor(diffMs / 1000);
+        const hrs = Math.floor(diffSecs / 3600);
+        const mins = Math.floor((diffSecs % 3600) / 60);
+        const secs = diffSecs % 60;
+        setTimerVal(`${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [myAttendanceToday, user]);
+
+  const handleClockIn = async () => {
+    if (!user) return;
+    try {
+      await clockIn(user.id);
+      triggerToast('Clocked in successfully!');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to clock in', 'error');
+    }
+  };
+
+  const handleClockOut = async () => {
+    if (!user) return;
+    if (!window.confirm('Are you sure you want to clock out?')) return;
+    try {
+      await clockOut(user.id);
+      triggerToast('Clocked out successfully!');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to clock out', 'error');
+    }
+  };
+
+  const employeeMonthlyStats = useMemo(() => {
+    if (user?.role !== 'EMPLOYEE') return null;
+    const currentMonthStr = today.substring(0, 7); // YYYY-MM
+    const myMonthRecords = attendance.filter(a => a.userId === user.id && a.date.startsWith(currentMonthStr));
+    
+    const present = myMonthRecords.filter(r => r.status === 'PRESENT').length;
+    const leave = myMonthRecords.filter(r => r.status === 'LEAVE').length;
+    
+    let totalMins = 0;
+    myMonthRecords.forEach(r => {
+      if (r.clockIn && r.clockOut) {
+        const [inH, inM] = r.clockIn.split(':').map(Number);
+        const [outH, outM] = r.clockOut.split(':').map(Number);
+        totalMins += (outH * 60 + outM) - (inH * 60 + inM);
+      }
+    });
+    
+    const totalHours = Math.round((totalMins / 60) * 10) / 10;
+    const rate = Math.min(100, Math.round((present / 22) * 100));
+    
+    return { present, leave, totalHours, rate };
+  }, [attendance, user]);
 
   // Daily Summary State
   const [dailySummaryDate, setDailySummaryDate] = useState(today);
@@ -131,6 +213,196 @@ export const Attendance: React.FC = () => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  if (user?.role === 'EMPLOYEE') {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+        
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">My Attendance</h1>
+            <p className="page-subtitle">Log your working hours, track presence, and review shift logs.</p>
+          </div>
+        </div>
+
+        {/* 1. Shift Control Panel */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="card p-6 md:col-span-2 flex flex-col justify-between relative overflow-hidden bg-white border border-warm-200">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-[30%] -right-[10%] w-[40%] h-[60%] rounded-full bg-primary-100/20 blur-[80px]" />
+            </div>
+            
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <span className="label text-muted font-mono uppercase tracking-wider">Shift Status — {today.split('-').reverse().join('/')}</span>
+                <h2 className="text-display-sm font-display text-foreground mt-1">
+                  {!myAttendanceToday ? (
+                    "You haven't checked in today"
+                  ) : myAttendanceToday.clockOut ? (
+                    "Shift ended for today"
+                  ) : (
+                    "Shift is Active"
+                  )}
+                </h2>
+                <p className="text-body-sm text-muted">
+                  {!myAttendanceToday ? (
+                    "Please click the button to check in and record your daily attendance."
+                  ) : myAttendanceToday.clockOut ? (
+                    `Completed: ${myAttendanceToday.clockIn} to ${myAttendanceToday.clockOut}`
+                  ) : (
+                    `Clocked in at ${myAttendanceToday.clockIn}. Shift timer is ticking.`
+                  )}
+                </p>
+              </div>
+
+              {/* Action Button */}
+              <div className="flex flex-col items-center sm:items-end justify-center shrink-0">
+                {myAttendanceToday && !myAttendanceToday.clockOut && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-forest-50 border border-forest-200 text-forest-700 font-mono text-body font-semibold rounded-2xl shadow-xs mb-4">
+                    <Timer className="w-5 h-5 text-forest-600 animate-pulse" />
+                    <span>{timerVal}</span>
+                  </div>
+                )}
+                
+                {!myAttendanceToday ? (
+                  <button onClick={handleClockIn} className="btn-primary bg-forest-700 hover:bg-forest-800 text-white px-8 py-3.5 shadow-soft-md transition-all duration-200 hover:shadow-soft-lg flex items-center gap-2 rounded-2xl font-semibold">
+                    <Clock className="w-5 h-5 animate-pulse" /> Clock In Now
+                  </button>
+                ) : myAttendanceToday.clockOut ? (
+                  <div className="flex items-center gap-2 px-6 py-3.5 bg-warm-100 text-warm-600 font-semibold rounded-2xl border border-warm-200 cursor-not-allowed">
+                    <CheckCircle2 className="w-5 h-5 text-warm-500" /> Day Completed
+                  </div>
+                ) : (
+                  <button onClick={handleClockOut} className="btn-danger bg-red-600 hover:bg-red-700 text-white px-8 py-3.5 shadow-soft-md transition-all duration-200 hover:shadow-soft-lg flex items-center gap-2 rounded-2xl font-semibold">
+                    <Clock className="w-5 h-5" /> Clock Out
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Info / Tips Card */}
+          <div className="card p-6 bg-warm-50 border border-warm-200 flex flex-col justify-between">
+            <div className="flex items-center gap-2 text-primary-800">
+              <Award className="w-5 h-5 text-primary-700" />
+              <span className="text-body-sm font-semibold">Shift Policy</span>
+            </div>
+            <div className="space-y-2 mt-4 text-body-sm text-muted">
+              <p>• Standard working shift duration is 8-9 hours.</p>
+              <p>• Make sure to clock out before leaving the field area.</p>
+              <p>• For leave applications, navigate to the Profile & Leaves portal.</p>
+            </div>
+            <div className="pt-4 border-t border-warm-200 mt-4 flex items-center justify-between text-caption text-muted">
+              <span>Required Hours: 8h/day</span>
+              <span>System Time: Online</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Monthly Stats Summary */}
+        <div className="space-y-3">
+          <h3 className="text-body font-semibold text-foreground">Monthly Metrics ({monthsList[new Date().getMonth()]} {new Date().getFullYear()})</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="card p-5 text-center space-y-1 bg-white border border-warm-200">
+              <span className="label text-muted block">Present Days</span>
+              <span className="text-display-sm font-bold font-display text-forest-700 flex items-center justify-center gap-1.5 mt-1">
+                <CheckCircle2 className="w-5 h-5" /> {employeeMonthlyStats?.present} days
+              </span>
+            </div>
+            <div className="card p-5 text-center space-y-1 bg-white border border-warm-200">
+              <span className="label text-muted block">Working Hours</span>
+              <span className="text-display-sm font-bold font-display text-primary-700 flex items-center justify-center gap-1.5 mt-1">
+                <Clock className="w-5 h-5" /> {employeeMonthlyStats?.totalHours} hrs
+              </span>
+            </div>
+            <div className="card p-5 text-center space-y-1 bg-white border border-warm-200">
+              <span className="label text-muted block">Leaves Taken</span>
+              <span className="text-display-sm font-bold font-display text-gold-600 flex items-center justify-center gap-1.5 mt-1">
+                <FileText className="w-5 h-5" /> {employeeMonthlyStats?.leave} days
+              </span>
+            </div>
+            <div className="card p-5 text-center space-y-1 bg-white border border-warm-200">
+              <span className="label text-muted block">Attendance Rate</span>
+              <span className="text-display-sm font-bold font-display text-forest-600 flex items-center justify-center gap-1.5 mt-1">
+                <Award className="w-5 h-5" /> {employeeMonthlyStats?.rate}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. History Filter & Table */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-body font-semibold text-foreground">My Attendance History</h3>
+            
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="select max-w-xs"
+            >
+              <option value="">All statuses</option>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LEAVE">Leave</option>
+            </select>
+          </div>
+
+          {filteredAttendance.length > 0 ? (
+            <div className="card overflow-hidden bg-white border border-warm-200">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="table-header">
+                      <th className="table-header th">Date</th>
+                      <th className="table-header th text-center">Status</th>
+                      <th className="table-header th text-center">Clock In</th>
+                      <th className="table-header th text-center">Clock Out</th>
+                      <th className="table-header th text-center">Working Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAttendance.map(a => (
+                      <tr key={a.id} className="table-row">
+                        <td className="table-cell text-body font-medium">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted" />
+                            {a.date.split('-').reverse().join('/')}
+                          </span>
+                        </td>
+                        <td className="table-cell text-center">
+                          <span className={`badge ${statusStyles[a.status] || 'badge-neutral'}`}>{a.status}</span>
+                        </td>
+                        <td className="table-cell text-center font-mono text-body-sm">
+                          <span className="flex items-center justify-center gap-1.5 text-muted">
+                            <Clock className="w-3.5 h-3.5 text-forest-600" /> {a.clockIn || '—'}
+                          </span>
+                        </td>
+                        <td className="table-cell text-center font-mono text-body-sm">
+                          <span className="flex items-center justify-center gap-1.5 text-muted">
+                            <Clock className="w-3.5 h-3.5" /> {a.clockOut || (a.clockIn ? <span className="text-forest-600 font-medium">Active</span> : '—')}
+                          </span>
+                        </td>
+                        <td className="table-cell text-center font-semibold font-mono text-body-sm text-primary-700">
+                          {calculateWorkingHours(a.clockIn, a.clockOut)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state card p-12 bg-white border border-warm-200">
+              <ShieldAlert className="w-10 h-10 text-warm-300 mb-3" />
+              <p className="font-medium text-warm-700">No attendance logs found</p>
+              <p className="text-body-sm text-muted mt-1">There are no records matching the selected status filter.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="page-header">
@@ -210,7 +482,7 @@ export const Attendance: React.FC = () => {
                   value={filterEmployee}
                   onChange={e => setFilterEmployee(e.target.value)}
                   className="select w-full"
-                  disabled={user?.role === 'EMPLOYEE'}
+                  disabled={false}
                 >
                   <option value="">All employees</option>
                   {employees.map(emp => (

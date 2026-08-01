@@ -192,8 +192,8 @@
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-fade-in {
@@ -257,3 +257,14 @@
     display: none !important;
   }
 }
+
+/* Prevent scroll on background when modal is open */
+body:has(.modal-backdrop),
+html:has(.modal-backdrop) {
+  overflow: hidden !important;
+}
+
+body:has(.modal-backdrop) main {
+  overflow: hidden !important;
+}
+

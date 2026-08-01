@@ -4,7 +4,7 @@ import prisma from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 export const createUser = async (req: AuthRequest, res: Response) => {
-  const { email, password, name, role, managerId } = req.body;
+  const { email, username, password, name, role, managerId } = req.body;
 
   try {
     const creatorRole = req.user?.role;
@@ -19,8 +19,8 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     }
 
     // Validation
-    if (!email || !password || !name || !role) {
-      return res.status(400).json({ error: 'Email, password, name, and role are required' });
+    if (!email || !username || !password || !name || !role) {
+      return res.status(400).json({ error: 'Email, username, password, name, and role are required' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -28,11 +28,17 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
+    const existingUsername = await prisma.user.findUnique({ where: { username } });
+    if (existingUsername) {
+      return res.status(400).json({ error: 'User with this username already exists' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
       data: {
         email,
+        username,
         password: hashedPassword,
         name,
         role,
@@ -41,6 +47,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         name: true,
         role: true,
         status: true,
@@ -80,6 +87,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
         select: {
           id: true,
           email: true,
+          username: true,
           name: true,
           role: true,
           status: true,
@@ -99,7 +107,7 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
 
 export const updateUser = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { name, email, status, password } = req.body;
+  const { name, email, status, password, username } = req.body;
 
   try {
     const requesterRole = req.user?.role;
@@ -116,11 +124,10 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-
-
     const data: any = {};
     if (name) data.name = name;
     if (email) data.email = email;
+    if (username) data.username = username;
     if (status) data.status = status;
 
     if (password) {
@@ -133,6 +140,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       select: {
         id: true,
         email: true,
+        username: true,
         name: true,
         role: true,
         status: true
