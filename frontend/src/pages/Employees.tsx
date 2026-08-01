@@ -188,28 +188,28 @@ export const Employees: React.FC = () => {
             <div
               key={emp.id}
               onClick={() => setSelectedEmployee(emp)}
-              className="card p-4 flex items-center justify-between hover:shadow-md transition-all cursor-pointer"
+              className="card p-4 flex flex-col min-[480px]:flex-row min-[480px]:items-center justify-between gap-4 hover:shadow-md transition-all cursor-pointer"
             >
               <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl bg-primary-700 text-white flex items-center justify-center font-semibold text-sm">
+                <div className="w-11 h-11 rounded-xl bg-primary-700 text-white flex items-center justify-center font-semibold text-sm shrink-0">
                   {emp.name.charAt(0)}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-body font-semibold text-foreground">{emp.name}</h3>
-                    <span className="text-xs font-mono text-muted">EMP-{String(emp.id).padStart(4, '0')}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-body font-semibold text-foreground truncate">{emp.name}</h3>
+                    <span className="text-xs font-mono text-muted shrink-0">EMP-{String(emp.id).padStart(4, '0')}</span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-body-sm text-muted">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-body-sm text-muted">
                     <span className="flex items-center gap-1">
                       <User className="w-3 h-3" /> {emp.username}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 truncate">
                       <Mail className="w-3 h-3" /> {emp.email}
                     </span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 justify-end w-full min-[480px]:w-auto border-t min-[480px]:border-t-0 border-warm-100 pt-3 min-[480px]:pt-0">
                 <span className={`badge ${emp.status === 'ACTIVE' ? 'badge-success' : 'badge-error'}`}>
                   {emp.status}
                 </span>

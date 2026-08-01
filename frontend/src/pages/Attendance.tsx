@@ -414,7 +414,7 @@ export const Attendance: React.FC = () => {
 
       {/* Tab Switcher - only for Admin */}
       {user?.role === 'ADMIN' && (
-        <div className="flex border-b border-warm-200 gap-6">
+        <div className="flex flex-wrap border-b border-warm-200 gap-x-6 gap-y-2">
           <button 
             onClick={() => setActiveTab('history')}
             className={`pb-3 text-body-sm font-semibold transition-all border-b-2 ${

@@ -109,7 +109,7 @@ export const Customers: React.FC = () => {
                   <span>{f.totalAnimals} {f.animalType === 'BOTH' ? 'animals' : f.animalType === 'COW' ? 'cows' : 'buffalos'}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 sm:gap-6 text-center shrink-0">
+              <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6 text-center shrink-0 w-full sm:w-auto border-t sm:border-t-0 border-warm-100 pt-3 sm:pt-0">
                 <div>
                   <span className="label text-muted block">Cows</span>
                   <span className="text-data font-display text-primary-700">{f.cowCount}</span>

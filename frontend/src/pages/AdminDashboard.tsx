@@ -75,7 +75,7 @@ export const AdminDashboard: React.FC = () => {
         <button onClick={handleOpenAddUser} className="btn-primary"><Plus className="w-4 h-4" /> Add user</button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {stats.map((s, i) => (
           <div key={i} className="card card-hover p-5 flex items-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
             <div className={`stat-icon ${s.bg} ${s.fg}`}>{s.icon}</div>

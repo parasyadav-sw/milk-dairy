@@ -274,11 +274,11 @@ export const NewSurvey: React.FC = () => {
         </div>
 
         {/* Submit Buttons */}
-        <div className="flex gap-3 justify-end">
-          <button type="button" onClick={() => navigate(-1)} className="btn-secondary px-6">
+        <div className="flex flex-col-reverse min-[480px]:flex-row gap-3 justify-end">
+          <button type="button" onClick={() => navigate(-1)} className="btn-secondary w-full min-[480px]:w-auto px-6">
             Cancel
           </button>
-          <button type="submit" className="btn-primary px-8">
+          <button type="submit" className="btn-primary w-full min-[480px]:w-auto px-8">
             Submit Survey
           </button>
         </div>
