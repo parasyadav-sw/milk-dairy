@@ -2,9 +2,8 @@
   "buildCommand": "npm run build:frontend",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://milk-dairy-backend-1p5s.onrender.com/api/:path*" },
-    { "source": "/uploads/:path*", "destination": "https://milk-dairy-backend-1p5s.onrender.com/uploads/:path*" },
-    { "handle": "filesystem" },
+    { "source": "/api/(.*)", "destination": "https://milk-dairy-backend-1p5s.onrender.com/api/$1" },
+    { "source": "/uploads/(.*)", "destination": "https://milk-dairy-backend-1p5s.onrender.com/uploads/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
