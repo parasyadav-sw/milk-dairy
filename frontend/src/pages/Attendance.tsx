@@ -125,7 +125,7 @@ export const Attendance: React.FC = () => {
       if (user?.role === 'EMPLOYEE' && a.userId !== user.id) return false;
       if (activeTab === 'history') {
         if (filterDate && a.date !== filterDate) return false;
-        if (filterEmployee && a.userId !== Number(filterEmployee)) return false;
+        if (filterEmployee && a.userId !== filterEmployee) return false;
         if (filterStatus && a.status !== filterStatus) return false;
       }
       return true;

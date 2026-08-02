@@ -27,7 +27,7 @@ export const Surveys: React.FC = () => {
       
       const matchesEmployee = 
         filterEmployee === '' || 
-        s.employeeId === Number(filterEmployee);
+        s.employeeId === filterEmployee;
 
       const matchesVillage = 
         filterVillage === '' || 

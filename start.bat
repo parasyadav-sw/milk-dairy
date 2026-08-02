@@ -27,28 +27,17 @@ if not exist frontend\node_modules (
     call npm install --workspace=frontend
 )
 
-rem Run migrations and generate Prisma Client if dev.db doesn't exist
-if not exist backend\prisma\dev.db (
-    echo [INFO] Initializing local database SQLite...
-    cd backend
-    call npx prisma db push
-    cd ..
-) else (
-    echo [INFO] SQLite database already exists.
-    cd backend
-    call npx prisma generate
-    cd ..
-)
-
+rem Supabase database is hosted remotely; no local database initialization required.
+echo Make sure you have set up your Supabase project credentials in frontend/.env
 
 echo.
-echo Starting frontend and backend concurrently...
+echo Starting frontend application...
 echo The browser will open automatically at http://localhost:3000
 echo.
 echo Press Ctrl+C to stop.
 echo.
 
-call npm run dev
+call npm run dev:frontend
 pause
 
 

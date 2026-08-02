@@ -106,7 +106,7 @@ export const Employees: React.FC = () => {
     if (statusFilter) {
       list = list.filter(u => u.status === statusFilter);
     }
-    return [...list].sort((a, b) => b.id - a.id);
+    return [...list].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }, [users, search, statusFilter]);
 
   const activeCount = users.filter(u => u.role === 'EMPLOYEE' && u.status === 'ACTIVE').length;
@@ -197,7 +197,7 @@ export const Employees: React.FC = () => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-body font-semibold text-foreground truncate">{emp.name}</h3>
-                    <span className="text-xs font-mono text-muted shrink-0">EMP-{String(emp.id).padStart(4, '0')}</span>
+                    <span className="text-xs font-mono text-muted shrink-0">EMP-{emp.username || emp.id.substring(0, 8)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-body-sm text-muted">
                     <span className="flex items-center gap-1">
@@ -310,7 +310,7 @@ export const Employees: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-foreground">{selectedEmployee.name}</h3>
-                  <p className="text-body-sm text-muted">EMP-{String(selectedEmployee.id).padStart(4, '0')}</p>
+                  <p className="text-body-sm text-muted">EMP-{selectedEmployee.username || selectedEmployee.id.substring(0, 8)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

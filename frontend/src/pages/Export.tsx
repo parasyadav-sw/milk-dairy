@@ -303,7 +303,8 @@ export const Export: React.FC = () => {
       result = result.filter(u => 
         u.name.toLowerCase().includes(q) || 
         u.email.toLowerCase().includes(q) ||
-        `EMP-${String(u.id).padStart(4, '0')}`.toLowerCase().includes(q)
+        u.id.toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q)
       );
     }
 
@@ -332,7 +333,7 @@ export const Export: React.FC = () => {
       result = result.filter(u => u.name.toLowerCase().includes(q));
     }
     if (empId.trim()) {
-      result = result.filter(u => String(u.id) === empId || `EMP-${String(u.id).padStart(4, '0')}`.includes(empId));
+      result = result.filter(u => String(u.id) === empId || (u.username || '').includes(empId) || u.id.includes(empId));
     }
     if (empStatus !== 'ALL') {
       result = result.filter(u => u.status === empStatus);
@@ -359,7 +360,7 @@ export const Export: React.FC = () => {
     } else if (globalSortBy === 'name_desc') {
       result.sort((a, b) => b.name.localeCompare(a.name));
     } else if (globalSortBy === 'id_asc') {
-      result.sort((a, b) => a.id - b.id);
+      result.sort((a, b) => (a.username || a.id).localeCompare(b.username || b.id));
     }
 
     return result;
@@ -580,9 +581,9 @@ export const Export: React.FC = () => {
       filename = `Employee_Report_${Date.now()}`;
       pdfTitle = 'Dairy Employees (Field Agents) Report';
       headers = ['ID', 'Name', 'Email', 'Role', 'Status', 'Joined Date'];
-      const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
+      const sortedEmployees = [...filteredEmployees].sort((a, b) => (a.username || a.id).localeCompare(b.username || b.id));
       rows = sortedEmployees.map(u => [
-        `EMP-${String(u.id).padStart(4, '0')}`, u.name, u.email, u.role, u.status, u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : 'N/A'
+        `EMP-${u.username || u.id.substring(0, 8)}`, u.name, u.email, u.role, u.status, u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : 'N/A'
       ]);
     } else if (reportType === 'surveys') {
       filename = `Survey_Report_${Date.now()}`;
