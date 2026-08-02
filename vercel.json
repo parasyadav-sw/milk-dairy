@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://milk-dairy-backend-1p5s.onrender.com/api/:path*" },
     { "source": "/uploads/:path*", "destination": "https://milk-dairy-backend-1p5s.onrender.com/uploads/:path*" },
+    { "handle": "filesystem" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
