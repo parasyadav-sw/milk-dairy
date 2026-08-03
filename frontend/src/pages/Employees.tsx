@@ -6,6 +6,8 @@ import {
   Users, Phone, Mail, Briefcase, CheckCircle2, XCircle, ShieldAlert 
 } from 'lucide-react';
 import { Toast } from '../components/Toast';
+import { Modal, ModalBody, ModalFooter } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const Employees: React.FC = () => {
   const { users, addUser, updateUser, deleteUser } = useDatabase();
@@ -236,17 +238,14 @@ export const Employees: React.FC = () => {
       )}
 
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-warm-100">
+        <Modal open={showModal} onClose={() => setShowModal(false)}>
+          <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-warm-100">
               <h2 className="text-lg font-semibold text-foreground">
                 {editingEmployee ? 'Edit employee' : 'Add new employee'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-warm-100 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-muted" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          </div>
+          <ModalBody className="pt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Full name *</label>
@@ -283,27 +282,23 @@ export const Employees: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-warm-100">
+              <ModalFooter className="px-0 pt-4 pb-0 border-t border-warm-100">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-ghost">Cancel</button>
                 <button type="submit" className="btn-primary">
                   {editingEmployee ? 'Save changes' : 'Add employee'}
                 </button>
-              </div>
+              </ModalFooter>
             </form>
-          </div>
-        </div>
+          </ModalBody>
+        </Modal>
       )}
 
       {selectedEmployee && (
-        <div className="modal-backdrop" onClick={() => setSelectedEmployee(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-warm-100">
+        <Modal open={!!selectedEmployee} onClose={() => setSelectedEmployee(null)}>
+          <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-warm-100">
               <h2 className="text-lg font-semibold text-foreground">Employee details</h2>
-              <button onClick={() => setSelectedEmployee(null)} className="p-1.5 hover:bg-warm-100 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-muted" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
+          </div>
+          <ModalBody className="pt-4">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-16 h-16 rounded-2xl bg-primary-700 text-white flex items-center justify-center font-bold text-2xl">
                   {selectedEmployee.name.charAt(0)}
@@ -342,34 +337,19 @@ export const Employees: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+          </ModalBody>
+        </Modal>
       )}
 
-      {deletingEmployee && (
-        <div className="modal-backdrop" onClick={() => setDeletingEmployee(null)}>
-          <div className="modal-content max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">Delete employee?</h3>
-              <p className="text-body-sm text-muted mb-6">
-                Are you sure you want to delete <strong>{deletingEmployee.name}</strong>? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button onClick={() => setDeletingEmployee(null)} className="btn-ghost px-6">
-                  Cancel
-                </button>
-                <button onClick={handleDelete} className="btn-primary bg-red-600 hover:bg-red-700 px-6">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deletingEmployee}
+        onClose={() => setDeletingEmployee(null)}
+        onConfirm={handleDelete}
+        title="Delete employee?"
+        message={`Are you sure you want to delete ${deletingEmployee?.name}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

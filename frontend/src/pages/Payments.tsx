@@ -3,6 +3,7 @@ import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
 import { Landmark, ArrowRight, ShieldAlert, CheckCircle, Search, Clock, IndianRupee } from 'lucide-react';
 import { Toast } from '../components/Toast';
+import { Modal, ModalBody, ModalFooter } from '../components/Modal';
 
 export const Payments: React.FC = () => {
   const { collections, payments, processPayment, farmers } = useDatabase();
@@ -116,25 +117,23 @@ export const Payments: React.FC = () => {
         </div>
       </div>
 
-      {activeFarmerPayout && (
-        <div className="modal-backdrop" onClick={() => setActiveFarmerPayout(null)}>
-          <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
+      <Modal open={!!activeFarmerPayout} onClose={() => setActiveFarmerPayout(null)} size="md">
+          <ModalBody>
             <h3 className="font-display text-display-md text-foreground mb-4">Authorize payout</h3>
-            <p className="text-body-sm text-muted mb-5">Settling for <strong>{activeFarmerPayout.farmerName}</strong> — {activeFarmerPayout.litres.toFixed(1)} L</p>
+            <p className="text-body-sm text-muted mb-5">Settling for <strong>{activeFarmerPayout?.farmerName}</strong> — {activeFarmerPayout?.litres.toFixed(1)} L</p>
             <form onSubmit={handleConfirmPayout} className="space-y-4">
               <div className="space-y-2">
                 <label className="label">Amount</label>
-                <div className="p-3 bg-red-50 border border-red-200/60 rounded-xl text-error font-medium text-data-lg">₹{activeFarmerPayout.amount.toFixed(2)}</div>
+                <div className="p-3 bg-red-50 border border-red-200/60 rounded-xl text-error font-medium text-data-lg">₹{activeFarmerPayout?.amount.toFixed(2)}</div>
               </div>
               <div className="space-y-2"><label className="label">Transaction ref</label><input type="text" required value={txnRef} onChange={(e) => setTxnRef(e.target.value)} className="input" /></div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-warm-100">
+              <ModalFooter className="px-0 pt-4 pb-0 border-t border-warm-100">
                 <button type="button" onClick={() => setActiveFarmerPayout(null)} className="btn-ghost">Cancel</button>
                 <button type="submit" className="btn-primary">Approve & pay</button>
-              </div>
+              </ModalFooter>
             </form>
-          </div>
-        </div>
-      )}
+          </ModalBody>
+      </Modal>
     </div>
   );
 };

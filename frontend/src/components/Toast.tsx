@@ -15,6 +15,14 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
     return () => clearTimeout(timer);
   }, [onClose]);
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
   const config = {
     success: {
       styles: 'bg-forest-50 text-forest-800 border-forest-200',
@@ -33,10 +41,18 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   const { styles, icon } = config[type];
 
   return (
-    <div className={`fixed bottom-5 right-5 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-soft-lg animate-slide-up max-w-sm ${styles}`}>
+    <div
+      className={`fixed bottom-5 right-5 z-[110] flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-soft-lg animate-slide-up max-w-sm ${styles}`}
+      role="alert"
+      aria-live="polite"
+    >
       {icon}
       <span className="text-body font-medium flex-1">{message}</span>
-      <button onClick={onClose} className="p-1 hover:bg-black/5 rounded-lg transition-colors shrink-0">
+      <button
+        onClick={onClose}
+        className="p-1 hover:bg-black/5 rounded-lg transition-colors shrink-0"
+        aria-label="Dismiss"
+      >
         <X className="w-4 h-4" />
       </button>
     </div>

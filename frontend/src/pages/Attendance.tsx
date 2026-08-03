@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, ShieldAlert, Clock, User, Filter, RotateCcw, Award, CheckCircle2, UserX, FileText, Timer } from 'lucide-react';
+import { useGPSTracking } from '../hooks/useGPSTracking';
+import { Calendar, ShieldAlert, Clock, User, Filter, RotateCcw, Award, CheckCircle2, UserX, FileText, Timer, MapPin, AlertTriangle } from 'lucide-react';
 import { Toast } from '../components/Toast';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -10,7 +12,21 @@ export const Attendance: React.FC = () => {
   const { attendance, users, clockIn, clockOut } = useDatabase();
   const { user } = useAuth();
 
+  const isClockedIn = useMemo(() => {
+    if (!user) return false;
+    const todayStr = today;
+    const myAtt = attendance.find(a => a.userId === user.id && a.date === todayStr);
+    return !!(myAtt && myAtt.clockIn && !myAtt.clockOut);
+  }, [attendance, user]);
+
+  const { isTracking, permissionState, error: gpsError } = useGPSTracking({
+    enabled: isClockedIn && user?.role === 'EMPLOYEE',
+    intervalMs: 30000,
+    userId: user?.id || '',
+  });
+
   const [activeTab, setActiveTab] = useState<'history' | 'daily' | 'monthly'>('history');
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   
   // Filters for History Tab
   const [filterDate, setFilterDate] = useState(today);
@@ -66,7 +82,12 @@ export const Attendance: React.FC = () => {
 
   const handleClockOut = async () => {
     if (!user) return;
-    if (!window.confirm('Are you sure you want to clock out?')) return;
+    setShowClockOutConfirm(true);
+  };
+
+  const confirmClockOut = async () => {
+    if (!user) return;
+    setShowClockOutConfirm(false);
     try {
       await clockOut(user.id);
       triggerToast('Clocked out successfully!');
@@ -261,6 +282,26 @@ export const Attendance: React.FC = () => {
                   <div className="flex items-center gap-2 px-4 py-2.5 bg-forest-50 border border-forest-200 text-forest-700 font-mono text-body font-semibold rounded-2xl shadow-xs mb-4">
                     <Timer className="w-5 h-5 text-forest-600 animate-pulse" />
                     <span>{timerVal}</span>
+                  </div>
+                )}
+
+                {isClockedIn && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-caption font-medium mb-4 ${
+                    isTracking
+                      ? 'bg-forest-50 text-forest-700 border border-forest-200'
+                      : permissionState === 'denied'
+                        ? 'bg-red-50 text-error border border-red-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    <MapPin className="w-3.5 h-3.5" />
+                    {isTracking ? 'GPS Tracking Active' : permissionState === 'denied' ? 'GPS Permission Denied' : 'GPS Starting...'}
+                  </div>
+                )}
+
+                {gpsError && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-error text-caption rounded-xl mb-4">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>{gpsError}</span>
                   </div>
                 )}
                 
@@ -740,6 +781,16 @@ export const Attendance: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showClockOutConfirm}
+        onClose={() => setShowClockOutConfirm(false)}
+        onConfirm={confirmClockOut}
+        title="Clock out?"
+        message="Are you sure you want to clock out now?"
+        confirmLabel="Clock Out"
+        variant="warning"
+      />
     </div>
   );
 };

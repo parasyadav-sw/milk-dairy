@@ -19,6 +19,10 @@
     line-height: 1.7;
   }
 
+  body.modal-open {
+    overflow: hidden !important;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: theme('colors.warm.300') transparent;
@@ -144,14 +148,6 @@
     @apply text-data-lg font-display;
   }
 
-  .modal-backdrop {
-    @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in;
-  }
-  
-  .modal-content {
-    @apply w-full max-w-2xl bg-white rounded-3xl border border-warm-200 shadow-soft-xl p-6 md:p-8 animate-scale-in max-h-[90vh] overflow-y-auto;
-  }
-
   .empty-state {
     @apply flex flex-col items-center justify-center py-16 text-center px-4;
   }
@@ -197,7 +193,16 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.15s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 @keyframes slideUp {
@@ -206,16 +211,25 @@
 }
 
 .animate-slide-up {
-  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+.animate-scale-out {
+  animation: scaleOut 0.15s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* Stagger animation delays */
@@ -258,14 +272,74 @@
   }
 }
 
-/* Prevent scroll on background when modal is open */
-body:has(.modal-backdrop),
-html:has(.modal-backdrop) {
-  overflow: hidden !important;
+/* Leaflet map container fixes */
+.leaflet-container {
+  z-index: 1;
+  font-family: inherit;
+  border-radius: 0;
 }
 
-body:has(.modal-backdrop) main {
-  overflow: hidden !important;
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.leaflet-control-zoom a {
+  color: #333 !important;
+  background: white !important;
+  border: none !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 16px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #f5f5f5 !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.leaflet-popup-close-button {
+  font-size: 18px !important;
+  color: #999 !important;
+  padding: 8px !important;
+}
+
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Responsive map sizing */
+@media (max-width: 1024px) {
+  .leaflet-container {
+    min-height: 350px;
+  }
+}
+
+@media (max-width: 640px) {
+  .leaflet-container {
+    min-height: 280px;
+  }
+
+  .leaflet-control-zoom {
+    margin: 8px !important;
+  }
 }
 
 /* Hide Microsoft Edge native password reveal button */
@@ -273,4 +347,3 @@ input::-ms-reveal,
 input::-ms-clear {
   display: none;
 }
-

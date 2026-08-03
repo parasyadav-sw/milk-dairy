@@ -3,6 +3,8 @@ import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
 import { Search, Plus, Edit, ShieldAlert, MapPin, Phone, User, Calendar, CreditCard, Home, ArrowLeft, Milk, Trash2 } from 'lucide-react';
 import { Toast } from '../components/Toast';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const Customers: React.FC = () => {
   const { farmers, addFarmer, updateFarmer, deleteFarmer, collections } = useDatabase();
@@ -137,9 +139,11 @@ export const Customers: React.FC = () => {
       )}
 
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3 className="font-display text-display-md text-foreground mb-6">{editingFarmer ? 'Edit customer' : 'Register customer'}</h3>
+        <Modal open={showModal} onClose={() => setShowModal(false)} size="md">
+          <ModalHeader>
+            <h3 className="font-display text-display-md text-foreground">{editingFarmer ? 'Edit customer' : 'Register customer'}</h3>
+          </ModalHeader>
+          <ModalBody className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2"><label className="label">Full name *</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input" /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -166,25 +170,27 @@ export const Customers: React.FC = () => {
                 <div className="space-y-2"><label className="label">Cow Milk Yield (L/animal)</label><input type="number" step="0.1" value={cowMilkYield} onChange={(e) => setCowMilkYield(e.target.value)} className="input" placeholder="e.g. 6.5" /></div>
                 <div className="space-y-2"><label className="label">Buffalo Milk Yield (L/animal)</label><input type="number" step="0.1" value={buffaloMilkYield} onChange={(e) => setBuffaloMilkYield(e.target.value)} className="input" placeholder="e.g. 8.0" /></div>
               </div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-warm-100">
+              <ModalFooter className="px-0 pt-4 pb-0 border-t border-warm-100">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-ghost">Cancel</button>
                 <button type="submit" className="btn-primary">{editingFarmer ? 'Save changes' : 'Register'}</button>
-              </div>
+              </ModalFooter>
             </form>
-          </div>
-        </div>
+          </ModalBody>
+        </Modal>
       )}
 
       {selectedFarmer && (
-        <div className="modal-backdrop" onClick={() => setSelectedFarmer(null)}>
-          <div className="modal-content max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-6">
+        <Modal open={!!selectedFarmer} onClose={() => setSelectedFarmer(null)} size="lg">
+          <ModalHeader>
+            <div className="flex items-center gap-3">
               <button onClick={() => setSelectedFarmer(null)} className="btn-icon"><ArrowLeft className="w-4 h-4" /></button>
               <div>
                 <h3 className="font-display text-display-md text-foreground">{selectedFarmer.name}</h3>
                 <span className="label text-muted font-mono">{selectedFarmer.id}</span>
               </div>
             </div>
+          </ModalHeader>
+          <ModalBody className="pt-0">
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -244,33 +250,19 @@ export const Customers: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </ModalBody>
+        </Modal>
       )}
 
-      {deletingFarmer && (
-        <div className="modal-backdrop" onClick={() => setDeletingFarmer(null)}>
-          <div className="modal-content max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">Delete customer?</h3>
-              <p className="text-body-sm text-muted mb-6">
-                Are you sure you want to delete <strong>{deletingFarmer.name}</strong>? This will also remove all their milk collection records.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button onClick={() => setDeletingFarmer(null)} className="btn-ghost px-6">
-                  Cancel
-                </button>
-                <button onClick={handleDelete} className="btn-primary bg-red-600 hover:bg-red-700 px-6">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deletingFarmer}
+        onClose={() => setDeletingFarmer(null)}
+        onConfirm={handleDelete}
+        title="Delete customer?"
+        message={<>Are you sure you want to delete <strong>{deletingFarmer?.name}</strong>? This will also remove all their milk collection records.</>}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

@@ -8,10 +8,10 @@ import { DashboardDispatcher } from './pages/DashboardDispatcher';
 import { Customers } from './pages/Customers';
 import { Employees } from './pages/Employees';
 import { Attendance } from './pages/Attendance';
-import { Surveys } from './pages/Surveys';
-import { NewSurvey } from './pages/NewSurvey';
+import { PotentialCustomers } from './pages/PotentialCustomers';
 import { Export } from './pages/Export';
 import { Profile } from './pages/Profile';
+import { LiveTracking } from './pages/LiveTracking';
 
 // Route Guard to verify active JWT sessions
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -102,19 +102,19 @@ export default function App() {
             />
 
             <Route 
-              path="/surveys" 
+              path="/potential-customers" 
               element={
                 <ProtectedRoute>
-                  <Surveys />
+                  <PotentialCustomers />
                 </ProtectedRoute>
               } 
             />
 
             <Route 
-              path="/new-survey" 
+              path="/live-tracking" 
               element={
                 <ProtectedRoute>
-                  <NewSurvey />
+                  <LiveTracking />
                 </ProtectedRoute>
               } 
             />

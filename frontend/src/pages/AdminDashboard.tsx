@@ -10,6 +10,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
+import { Toast } from '../components/Toast';
+import { Modal, ModalBody, ModalFooter } from '../components/Modal';
 
 export const AdminDashboard: React.FC = () => {
   const { users, farmers, collections, payments, auditLogs, surveys, attendance, addUser, updateUser } = useDatabase();
@@ -191,9 +193,8 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {showUserModal && (
-        <div className="modal-backdrop" onClick={() => setShowUserModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <Modal open={showUserModal} onClose={() => setShowUserModal(false)}>
+        <ModalBody className="pt-8">
             <h3 className="font-display text-display-md text-foreground mb-6">{editingUser ? 'Edit user' : 'Add user'}</h3>
             {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-error text-body-sm font-medium rounded-xl">{error}</div>}
             {success && <div className="mb-4 p-3 bg-forest-50 border border-forest-200 text-forest-700 text-body-sm font-medium rounded-xl">{success}</div>}
@@ -202,11 +203,13 @@ export const AdminDashboard: React.FC = () => {
               <div className="space-y-2"><label className="label">Email</label><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" /></div>
               {!editingUser && <div className="space-y-2"><label className="label">Password</label><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input" /></div>}
               <div className="space-y-2"><label className="label">Role</label><select value={role} onChange={(e: any) => setRole(e.target.value)} className="select"><option value="EMPLOYEE">Employee</option><option value="ADMIN">Admin</option></select></div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-warm-100"><button type="button" onClick={() => setShowUserModal(false)} className="btn-ghost">Cancel</button><button type="submit" className="btn-primary">{editingUser ? 'Save changes' : 'Create user'}</button></div>
+              <ModalFooter className="px-0 pt-4 pb-0 border-t border-warm-100">
+                <button type="button" onClick={() => setShowUserModal(false)} className="btn-ghost">Cancel</button>
+                <button type="submit" className="btn-primary">{editingUser ? 'Save changes' : 'Create user'}</button>
+              </ModalFooter>
             </form>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
     </div>
   );
 };

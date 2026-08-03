@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDatabase } from '../context/DatabaseContext';
 import { 
   Milk, LayoutDashboard, Users, 
   CalendarCheck, ClipboardList, LogOut, Database, UserCheck, 
-  ChevronRight, Menu, X, PlusCircle, Download, User
+  ChevronRight, Menu, X, PlusCircle, Download, User, Radio
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -20,6 +20,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (mobileOpen) setMobileOpen(false);
+        if (profileOpen) setProfileOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [mobileOpen, profileOpen]);
 
   const handleRoleSimulation = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const roleName = e.target.value;
@@ -43,11 +54,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const getNavLinks = () => {
     const links = [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
-      { path: '/new-survey', label: 'New Survey', icon: <PlusCircle className="w-[18px] h-[18px]" />, roles: ['EMPLOYEE'] },
+      { path: '/potential-customers', label: 'Potential Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/employees', label: 'Employees', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
-      { path: '/surveys', label: 'Surveys', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/live-tracking', label: 'Live Tracking', icon: <Radio className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/export', label: 'Export', icon: <Download className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/profile', label: 'Profile', icon: <User className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
     ];

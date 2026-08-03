@@ -121,6 +121,74 @@ export interface Survey {
   createdAt?: string;
 }
 
+export interface PotentialCustomer {
+  id: number;
+  category: 'FARMER' | 'CHAIRMAN';
+  fullName: string;
+  mobile: string;
+  village: string;
+  address: string;
+  interestStatus: 'INTERESTED' | 'FOLLOW_UP' | 'NOT_INTERESTED' | 'CONVERTED';
+  remarks?: string;
+  employeeId: string;
+  employeeName?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Farmer fields
+  cowCount: number;
+  buffaloCount: number;
+  totalAnimals: number;
+  cowMilkYield: number;
+  buffaloMilkYield: number;
+  totalCowMilk: number;
+  totalBuffaloMilk: number;
+  totalDailyMilk: number;
+  avgMilkPerAnimal: number;
+  // Chairman fields
+  dairySocietyName?: string;
+  dailyMilkCapacity: number;
+  existingDairyPartner?: string;
+  // Conversion
+  convertedFarmerId?: string;
+  convertedAt?: string;
+}
+
+export interface EmployeeLocation {
+  id: number;
+  userId: string;
+  userName?: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed: number | null;
+  batteryLevel: number | null;
+  timestamp: string;
+  note?: string;
+}
+
+export interface Geofence {
+  id: number;
+  name: string;
+  centerLat: number;
+  centerLng: number;
+  radiusMeters: number;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface GeofenceAlert {
+  id: number;
+  userId: string;
+  userName?: string;
+  geofenceId: number;
+  geofenceName?: string;
+  alertType: 'ENTER' | 'EXIT';
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
 interface DatabaseContextType {
   isApiMode: boolean;
   setApiMode: (val: boolean) => void;
@@ -132,6 +200,10 @@ interface DatabaseContextType {
   leaves: Leave[];
   auditLogs: AuditLog[];
   surveys: Survey[];
+  potentialCustomers: PotentialCustomer[];
+  locations: EmployeeLocation[];
+  geofences: Geofence[];
+  geofenceAlerts: GeofenceAlert[];
   refreshData: () => Promise<void>;
   
   // Mutating Operations
@@ -148,6 +220,20 @@ interface DatabaseContextType {
   applyLeave: (userId: string, startDate: string, endDate: string, reason: string) => Promise<Leave>;
   approveRejectLeave: (leaveId: number, status: 'APPROVED' | 'REJECTED', approverId: string) => Promise<Leave>;
   addSurvey: (data: Partial<Survey>) => Promise<Survey>;
+
+  // Potential Customer Operations
+  addPotentialCustomer: (data: Partial<PotentialCustomer>) => Promise<PotentialCustomer>;
+  updatePotentialCustomer: (id: number, data: Partial<PotentialCustomer>) => Promise<PotentialCustomer>;
+  deletePotentialCustomer: (id: number) => Promise<void>;
+  convertToCustomer: (id: number) => Promise<Farmer>;
+
+  // Tracking Operations
+  fetchLocations: () => Promise<void>;
+  fetchLocationHistory: (userId: string, date: string) => Promise<EmployeeLocation[]>;
+  addGeofence: (data: Omit<Geofence, 'id' | 'createdAt'>) => Promise<Geofence>;
+  deleteGeofence: (id: number) => Promise<void>;
+  refreshLocations: () => Promise<void>;
+  refreshGeofenceAlerts: () => Promise<void>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -155,13 +241,17 @@ const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined
 // Secondary non-persisted client for creating new users
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const adminAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
+const adminAuthClient = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
   }
-});
+);
 
 const calculateMockRate = (fat: number, snf: number) => {
   return Math.round(((fat * 5.0) + (snf * 3.5)) * 100) / 100;
@@ -287,10 +377,14 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [potentialCustomers, setPotentialCustomers] = useState<PotentialCustomer[]>([]);
+  const [locations, setLocations] = useState<EmployeeLocation[]>([]);
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
+  const [geofenceAlerts, setGeofenceAlerts] = useState<GeofenceAlert[]>([]);
 
   const refreshData = async () => {
     try {
-      const [uRes, fRes, cRes, pRes, aRes, lRes, logRes, sRes] = await Promise.all([
+      const [uRes, fRes, cRes, pRes, aRes, lRes, logRes, sRes, pcRes, locRes, gfRes, gaRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('farmers').select('*, profiles(name)'),
         supabase.from('milk_collections').select('*, profiles(name), farmers(name, village)'),
@@ -298,7 +392,11 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         supabase.from('attendance').select('*, profiles(name)'),
         supabase.from('leaves').select('*, user:profiles!leaves_user_id_fkey(name), approver:profiles!leaves_approved_by_id_fkey(name)'),
         supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }),
-        supabase.from('surveys').select('*, profiles(name)')
+        supabase.from('surveys').select('*, profiles(name)'),
+        supabase.from('potential_customers').select('*, profiles(name)').order('created_at', { ascending: false }),
+        supabase.from('employee_locations').select('*, profiles(name)').order('timestamp', { ascending: false }).limit(500),
+        supabase.from('geofences').select('*'),
+        supabase.from('geofence_alerts').select('*, profiles(name)').order('timestamp', { ascending: false }).limit(200),
       ]);
 
       if (uRes.error) throw uRes.error;
@@ -318,6 +416,67 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLeaves((lRes.data || []).map(mapLeaveToJs));
       setAuditLogs((logRes.data || []).map(mapAuditLogToJs));
       setSurveys((sRes.data || []).map(mapSurveyToJs));
+      setPotentialCustomers((pcRes.data || []).map((pc: any) => ({
+        id: Number(pc.id),
+        category: pc.category,
+        fullName: pc.full_name,
+        mobile: pc.mobile,
+        village: pc.village,
+        address: pc.address,
+        interestStatus: pc.interest_status,
+        remarks: pc.remarks || undefined,
+        employeeId: pc.employee_id,
+        employeeName: pc.profiles?.name,
+        createdAt: pc.created_at,
+        updatedAt: pc.updated_at,
+        cowCount: pc.cow_count || 0,
+        buffaloCount: pc.buffalo_count || 0,
+        totalAnimals: pc.total_animals || 0,
+        cowMilkYield: pc.cow_milk_yield || 0,
+        buffaloMilkYield: pc.buffalo_milk_yield || 0,
+        totalCowMilk: pc.total_cow_milk || 0,
+        totalBuffaloMilk: pc.total_buffalo_milk || 0,
+        totalDailyMilk: pc.total_daily_milk || 0,
+        avgMilkPerAnimal: pc.avg_milk_per_animal || 0,
+        dairySocietyName: pc.dairy_society_name || undefined,
+        dailyMilkCapacity: pc.daily_milk_capacity || 0,
+        existingDairyPartner: pc.existing_dairy_partner || undefined,
+        convertedFarmerId: pc.converted_farmer_id || undefined,
+        convertedAt: pc.converted_at || undefined,
+      })));
+      setLocations((locRes.data || []).map((l: any) => ({
+        id: Number(l.id),
+        userId: l.user_id,
+        userName: l.profiles?.name,
+        latitude: l.latitude,
+        longitude: l.longitude,
+        accuracy: l.accuracy,
+        speed: l.speed,
+        batteryLevel: l.battery_level,
+        timestamp: l.timestamp,
+        note: l.note || undefined,
+      })));
+      setGeofences((gfRes.data || []).map((g: any) => ({
+        id: Number(g.id),
+        name: g.name,
+        centerLat: g.center_lat,
+        centerLng: g.center_lng,
+        radiusMeters: g.radius_meters,
+        isActive: g.is_active,
+        createdBy: g.created_by,
+        createdAt: g.created_at,
+      })));
+      setGeofenceAlerts((gaRes.data || []).map((a: any) => ({
+        id: Number(a.id),
+        userId: a.user_id,
+        userName: a.profiles?.name,
+        geofenceId: a.geofence_id,
+        geofenceName: a.geofence_name,
+        alertType: a.alert_type,
+        latitude: a.latitude,
+        longitude: a.longitude,
+        timestamp: a.timestamp,
+      })));
     } catch (err) {
       console.error('Error refreshing data from Supabase:', err);
     }
@@ -840,6 +999,317 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return mapSurveyToJs(newSurvey);
   };
 
+  // --- POTENTIAL CUSTOMER OPERATIONS ---
+
+  const addPotentialCustomer = async (data: Partial<PotentialCustomer>): Promise<PotentialCustomer> => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) throw new Error('Unauthenticated');
+
+    const payload = {
+      category: data.category || 'FARMER',
+      full_name: data.fullName || '',
+      mobile: data.mobile || '',
+      village: data.village || '',
+      address: data.address || '',
+      interest_status: data.interestStatus || 'INTERESTED',
+      remarks: data.remarks || null,
+      employee_id: currentUser.id,
+      cow_count: data.cowCount || 0,
+      buffalo_count: data.buffaloCount || 0,
+      total_animals: data.totalAnimals || 0,
+      cow_milk_yield: data.cowMilkYield || 0,
+      buffalo_milk_yield: data.buffaloMilkYield || 0,
+      total_cow_milk: data.totalCowMilk || 0,
+      total_buffalo_milk: data.totalBuffaloMilk || 0,
+      total_daily_milk: data.totalDailyMilk || 0,
+      avg_milk_per_animal: data.avgMilkPerAnimal || 0,
+      dairy_society_name: data.dairySocietyName || null,
+      daily_milk_capacity: data.dailyMilkCapacity || 0,
+      existing_dairy_partner: data.existingDairyPartner || null,
+    };
+
+    const { data: newRecord, error } = await supabase
+      .from('potential_customers')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logAudit(currentUser.id, 'CREATE_POTENTIAL_CUSTOMER', `Added potential customer ${data.fullName} (${data.category})`);
+    await refreshData();
+
+    return {
+      id: Number(newRecord.id),
+      category: newRecord.category,
+      fullName: newRecord.full_name,
+      mobile: newRecord.mobile,
+      village: newRecord.village,
+      address: newRecord.address,
+      interestStatus: newRecord.interest_status,
+      remarks: newRecord.remarks || undefined,
+      employeeId: newRecord.employee_id,
+      employeeName: currentUser.user_metadata?.name,
+      createdAt: newRecord.created_at,
+      updatedAt: newRecord.updated_at,
+      cowCount: newRecord.cow_count || 0,
+      buffaloCount: newRecord.buffalo_count || 0,
+      totalAnimals: newRecord.total_animals || 0,
+      cowMilkYield: newRecord.cow_milk_yield || 0,
+      buffaloMilkYield: newRecord.buffalo_milk_yield || 0,
+      totalCowMilk: newRecord.total_cow_milk || 0,
+      totalBuffaloMilk: newRecord.total_buffalo_milk || 0,
+      totalDailyMilk: newRecord.total_daily_milk || 0,
+      avgMilkPerAnimal: newRecord.avg_milk_per_animal || 0,
+      dairySocietyName: newRecord.dairy_society_name || undefined,
+      dailyMilkCapacity: newRecord.daily_milk_capacity || 0,
+      existingDairyPartner: newRecord.existing_dairy_partner || undefined,
+    };
+  };
+
+  const updatePotentialCustomer = async (id: number, data: Partial<PotentialCustomer>): Promise<PotentialCustomer> => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) throw new Error('Unauthenticated');
+
+    const updatePayload: any = {};
+    if (data.fullName !== undefined) updatePayload.full_name = data.fullName;
+    if (data.mobile !== undefined) updatePayload.mobile = data.mobile;
+    if (data.village !== undefined) updatePayload.village = data.village;
+    if (data.address !== undefined) updatePayload.address = data.address;
+    if (data.interestStatus !== undefined) updatePayload.interest_status = data.interestStatus;
+    if (data.remarks !== undefined) updatePayload.remarks = data.remarks;
+    if (data.cowCount !== undefined) updatePayload.cow_count = data.cowCount;
+    if (data.buffaloCount !== undefined) updatePayload.buffalo_count = data.buffaloCount;
+    if (data.totalAnimals !== undefined) updatePayload.total_animals = data.totalAnimals;
+    if (data.cowMilkYield !== undefined) updatePayload.cow_milk_yield = data.cowMilkYield;
+    if (data.buffaloMilkYield !== undefined) updatePayload.buffalo_milk_yield = data.buffaloMilkYield;
+    if (data.totalCowMilk !== undefined) updatePayload.total_cow_milk = data.totalCowMilk;
+    if (data.totalBuffaloMilk !== undefined) updatePayload.total_buffalo_milk = data.totalBuffaloMilk;
+    if (data.totalDailyMilk !== undefined) updatePayload.total_daily_milk = data.totalDailyMilk;
+    if (data.avgMilkPerAnimal !== undefined) updatePayload.avg_milk_per_animal = data.avgMilkPerAnimal;
+    if (data.dairySocietyName !== undefined) updatePayload.dairy_society_name = data.dairySocietyName;
+    if (data.dailyMilkCapacity !== undefined) updatePayload.daily_milk_capacity = data.dailyMilkCapacity;
+    if (data.existingDairyPartner !== undefined) updatePayload.existing_dairy_partner = data.existingDairyPartner;
+
+    const { data: updated, error } = await supabase
+      .from('potential_customers')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logAudit(currentUser.id, 'UPDATE_POTENTIAL_CUSTOMER', `Updated potential customer ID ${id}`);
+    await refreshData();
+
+    return {
+      id: Number(updated.id),
+      category: updated.category,
+      fullName: updated.full_name,
+      mobile: updated.mobile,
+      village: updated.village,
+      address: updated.address,
+      interestStatus: updated.interest_status,
+      remarks: updated.remarks || undefined,
+      employeeId: updated.employee_id,
+      employeeName: currentUser.user_metadata?.name,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+      cowCount: updated.cow_count || 0,
+      buffaloCount: updated.buffalo_count || 0,
+      totalAnimals: updated.total_animals || 0,
+      cowMilkYield: updated.cow_milk_yield || 0,
+      buffaloMilkYield: updated.buffalo_milk_yield || 0,
+      totalCowMilk: updated.total_cow_milk || 0,
+      totalBuffaloMilk: updated.total_buffalo_milk || 0,
+      totalDailyMilk: updated.total_daily_milk || 0,
+      avgMilkPerAnimal: updated.avg_milk_per_animal || 0,
+      dairySocietyName: updated.dairy_society_name || undefined,
+      dailyMilkCapacity: updated.daily_milk_capacity || 0,
+      existingDairyPartner: updated.existing_dairy_partner || undefined,
+    };
+  };
+
+  const deletePotentialCustomer = async (id: number) => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) throw new Error('Unauthenticated');
+
+    const { error } = await supabase.from('potential_customers').delete().eq('id', id);
+    if (error) throw error;
+
+    await logAudit(currentUser.id, 'DELETE_POTENTIAL_CUSTOMER', `Deleted potential customer ID ${id}`);
+    await refreshData();
+  };
+
+  const convertToCustomer = async (id: number): Promise<Farmer> => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) throw new Error('Unauthenticated');
+
+    // Fetch the potential customer
+    const { data: pc, error: fetchErr } = await supabase
+      .from('potential_customers')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !pc) throw new Error('Potential customer not found');
+    if (pc.interest_status === 'CONVERTED') throw new Error('Already converted');
+
+    // Generate farmer ID
+    const { count } = await supabase.from('farmers').select('*', { count: 'exact', head: true });
+    const farmerId = `FMR-${String((count || 0) + 1).padStart(4, '0')}`;
+
+    // Create farmer record
+    const farmerPayload: any = {
+      id: farmerId,
+      name: pc.full_name,
+      mobile: pc.mobile,
+      gender: 'MALE',
+      age: 30,
+      village: pc.village,
+      taluka: 'Jaipur',
+      district: 'Jaipur',
+      address: pc.address,
+      animal_type: pc.category === 'CHAIRMAN' ? 'COW' : (pc.cow_count > 0 && pc.buffalo_count > 0 ? 'BOTH' : pc.cow_count > 0 ? 'COW' : 'BUFFALO'),
+      cow_count: pc.cow_count || 0,
+      buffalo_count: pc.buffalo_count || 0,
+      total_animals: pc.total_animals || 0,
+      cow_milk_yield: pc.avg_milk_per_animal || 0,
+      buffalo_milk_yield: pc.avg_milk_per_animal || 0,
+      registered_by_id: currentUser.id,
+      notes: pc.remarks || `Converted from potential customer (${pc.category})`,
+    };
+
+    const { data: newFarmer, error: farmerErr } = await supabase
+      .from('farmers')
+      .insert(farmerPayload)
+      .select()
+      .single();
+
+    if (farmerErr) throw farmerErr;
+
+    // Update potential customer as converted
+    await supabase
+      .from('potential_customers')
+      .update({
+        interest_status: 'CONVERTED',
+        converted_farmer_id: farmerId,
+        converted_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    await logAudit(currentUser.id, 'CONVERT_POTENTIAL_CUSTOMER', `Converted ${pc.full_name} to customer ${farmerId}`);
+    await refreshData();
+
+    return mapFarmerToJs(newFarmer);
+  };
+
+  // --- TRACKING OPERATIONS ---
+
+  const refreshLocations = async () => {
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('*, profiles(name)')
+      .order('timestamp', { ascending: false })
+      .limit(500);
+    if (!error && data) {
+      setLocations(data.map((l: any) => ({
+        id: Number(l.id),
+        userId: l.user_id,
+        userName: l.profiles?.name,
+        latitude: l.latitude,
+        longitude: l.longitude,
+        accuracy: l.accuracy,
+        speed: l.speed,
+        batteryLevel: l.battery_level,
+        timestamp: l.timestamp,
+      })));
+    }
+  };
+
+  const fetchLocations = async () => {
+    await refreshLocations();
+  };
+
+  const fetchLocationHistory = async (userId: string, date: string): Promise<EmployeeLocation[]> => {
+    const startOfDay = `${date}T00:00:00`;
+    const endOfDay = `${date}T23:59:59`;
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('*, profiles(name)')
+      .eq('user_id', userId)
+      .gte('timestamp', startOfDay)
+      .lte('timestamp', endOfDay)
+      .order('timestamp', { ascending: true });
+    if (error || !data) return [];
+    return data.map((l: any) => ({
+      id: Number(l.id),
+      userId: l.user_id,
+      userName: l.profiles?.name,
+      latitude: l.latitude,
+      longitude: l.longitude,
+      accuracy: l.accuracy,
+      speed: l.speed,
+      batteryLevel: l.battery_level,
+      timestamp: l.timestamp,
+    }));
+  };
+
+  const addGeofence = async (data: Omit<Geofence, 'id' | 'createdAt'>): Promise<Geofence> => {
+    const { data: newGeo, error } = await supabase
+      .from('geofences')
+      .insert({
+        name: data.name,
+        center_lat: data.centerLat,
+        center_lng: data.centerLng,
+        radius_meters: data.radiusMeters,
+        is_active: data.isActive,
+        created_by: data.createdBy,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    await refreshData();
+    return {
+      id: Number(newGeo.id),
+      name: newGeo.name,
+      centerLat: newGeo.center_lat,
+      centerLng: newGeo.center_lng,
+      radiusMeters: newGeo.radius_meters,
+      isActive: newGeo.is_active,
+      createdBy: newGeo.created_by,
+      createdAt: newGeo.created_at,
+    };
+  };
+
+  const deleteGeofence = async (id: number) => {
+    const { error } = await supabase.from('geofences').delete().eq('id', id);
+    if (error) throw error;
+    await refreshData();
+  };
+
+  const refreshGeofenceAlerts = async () => {
+    const { data, error } = await supabase
+      .from('geofence_alerts')
+      .select('*, profiles(name)')
+      .order('timestamp', { ascending: false })
+      .limit(200);
+    if (!error && data) {
+      setGeofenceAlerts(data.map((a: any) => ({
+        id: Number(a.id),
+        userId: a.user_id,
+        userName: a.profiles?.name,
+        geofenceId: a.geofence_id,
+        geofenceName: a.geofence_name,
+        alertType: a.alert_type,
+        latitude: a.latitude,
+        longitude: a.longitude,
+        timestamp: a.timestamp,
+      })));
+    }
+  };
+
   return (
     <DatabaseContext.Provider value={{
       isApiMode,
@@ -852,6 +1322,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       leaves,
       auditLogs,
       surveys,
+      potentialCustomers,
+      locations,
+      geofences,
+      geofenceAlerts,
       refreshData,
       addUser,
       updateUser,
@@ -865,7 +1339,17 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clockOut,
       applyLeave,
       approveRejectLeave,
-      addSurvey
+      addSurvey,
+      addPotentialCustomer,
+      updatePotentialCustomer,
+      deletePotentialCustomer,
+      convertToCustomer,
+      fetchLocations,
+      fetchLocationHistory,
+      addGeofence,
+      deleteGeofence,
+      refreshLocations,
+      refreshGeofenceAlerts,
     }}>
       {children}
     </DatabaseContext.Provider>
