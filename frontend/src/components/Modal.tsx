@@ -29,36 +29,38 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      onClose();
-    }
-  }, [onClose]);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement as HTMLElement;
-      document.body.style.overflow = 'hidden';
-      document.addEventListener('keydown', handleKeyDown);
+    if (!open) return;
 
-      requestAnimationFrame(() => {
-        const focusable = contentRef.current?.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        focusable?.focus();
-      });
-    }
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCloseRef.current();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    requestAnimationFrame(() => {
+      const focusable = contentRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      focusable?.focus();
+    });
 
     return () => {
       document.body.style.overflow = '';
       document.removeEventListener('keydown', handleKeyDown);
-      if (previousFocusRef.current && open) {
+      if (previousFocusRef.current) {
         previousFocusRef.current.focus();
       }
     };
-  }, [open, handleKeyDown]);
+  }, [open]);
 
   if (!open) return null;
 
