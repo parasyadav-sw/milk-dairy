@@ -72,10 +72,15 @@ export function useGPSTracking({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSentRef = useRef<number>(0);
   const noteRef = useRef<string | undefined>(note);
+  const tripIdRef = useRef<number | null | undefined>(tripId);
 
   useEffect(() => {
     noteRef.current = note;
   }, [note]);
+
+  useEffect(() => {
+    tripIdRef.current = tripId;
+  }, [tripId]);
 
   // Push note changes to the most recent location record immediately
   useEffect(() => {
@@ -106,7 +111,7 @@ export function useGPSTracking({
     try {
       await supabase.from('employee_locations').insert({
         user_id: userId,
-        trip_id: tripId || null,
+        trip_id: tripIdRef.current || null,
         latitude: loc.latitude,
         longitude: loc.longitude,
         accuracy: loc.accuracy,
@@ -118,7 +123,7 @@ export function useGPSTracking({
     } catch (err) {
       console.error('Failed to upload location:', err);
     }
-  }, [userId, tripId]);
+  }, [userId]);
 
   const handlePosition = useCallback(async (position: GeolocationPosition) => {
     const now = Date.now();

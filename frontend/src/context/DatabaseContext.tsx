@@ -493,6 +493,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         id: Number(l.id),
         userId: l.user_id,
         userName: l.profiles?.name,
+        tripId: l.trip_id || undefined,
         latitude: l.latitude,
         longitude: l.longitude,
         accuracy: l.accuracy,
@@ -561,6 +562,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             id: Number(newRow.id),
             userId: newRow.user_id,
             userName: profile?.name,
+            tripId: newRow.trip_id || undefined,
             latitude: newRow.latitude,
             longitude: newRow.longitude,
             accuracy: newRow.accuracy,
@@ -608,6 +610,51 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             timestamp: newRow.timestamp,
           };
           setNotes(prev => [mapped, ...prev].slice(0, 200));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Supabase Realtime: subscribe to location_trips inserts/updates for live admin trip status
+  useEffect(() => {
+    const channel = supabase
+      .channel('location_trips_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'location_trips' },
+        async (payload: any) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+          const trip: LocationTrip = {
+            id: newRow.id,
+            userId: newRow.user_id,
+            userName: newRow.user_name,
+            startedAt: newRow.started_at,
+            endedAt: newRow.ended_at,
+            startLat: newRow.start_lat,
+            startLng: newRow.start_lng,
+            startLocationName: newRow.start_location_name,
+            endLat: newRow.end_lat,
+            endLng: newRow.end_lng,
+            endLocationName: newRow.end_location_name,
+            totalDistanceKm: newRow.total_distance_km || 0,
+            pointCount: newRow.point_count || 0,
+            status: newRow.status,
+            createdAt: newRow.created_at,
+          };
+          setTrips(prev => {
+            const idx = prev.findIndex(t => t.id === trip.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = trip;
+              return updated;
+            }
+            return [trip, ...prev];
+          });
         }
       )
       .subscribe();
@@ -1348,12 +1395,14 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         id: Number(l.id),
         userId: l.user_id,
         userName: l.profiles?.name,
+        tripId: l.trip_id || undefined,
         latitude: l.latitude,
         longitude: l.longitude,
         accuracy: l.accuracy,
         speed: l.speed,
         batteryLevel: l.battery_level,
         timestamp: l.timestamp,
+        note: l.note || undefined,
       })));
     }
   };
