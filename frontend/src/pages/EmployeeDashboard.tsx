@@ -213,7 +213,13 @@ export const EmployeeDashboard: React.FC = () => {
         } catch {}
         const trip = await createTrip(user.id, user.name, startLat, startLng);
         setActiveTripId(trip.id);
-      } catch {}
+        triggerToast('Location sharing started');
+      } catch (err: any) {
+        console.error('[GPS] Failed to start sharing:', err);
+        setShareLocation(false);
+        localStorage.removeItem(`locationSharing_${user.id}`);
+        triggerToast('Failed to start location sharing: ' + (err?.message || 'Unknown error'), 'error');
+      }
     }
   };
 

@@ -95,33 +95,36 @@ export function useGPSTracking({
           .limit(1)
           .single();
         if (latest) {
-          await supabase
+          const { error } = await supabase
             .from('employee_locations')
             .update({ note })
             .eq('id', latest.id);
+          if (error) console.error('[GPS] Note update failed:', error.message);
         }
-      } catch {
-        // ignore — will be set on next GPS upload
+      } catch (err) {
+        console.error('[GPS] Note update exception:', err);
       }
     }, 500);
     return () => clearTimeout(timeout);
   }, [note, enabled, userId]);
 
   const uploadLocation = useCallback(async (loc: LocationData, currentNote?: string) => {
-    try {
-      await supabase.from('employee_locations').insert({
-        user_id: userId,
-        trip_id: tripIdRef.current || null,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        accuracy: loc.accuracy,
-        speed: loc.speed,
-        battery_level: loc.batteryLevel,
-        timestamp: new Date(loc.timestamp).toISOString(),
-        note: currentNote || null,
-      });
-    } catch (err) {
-      console.error('Failed to upload location:', err);
+    const record: Record<string, any> = {
+      user_id: userId,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      accuracy: loc.accuracy,
+      speed: loc.speed,
+      battery_level: loc.batteryLevel,
+      timestamp: new Date(loc.timestamp).toISOString(),
+      note: currentNote || null,
+    };
+    if (tripIdRef.current) {
+      record.trip_id = tripIdRef.current;
+    }
+    const { data, error } = await supabase.from('employee_locations').insert(record);
+    if (error) {
+      console.error('[GPS] Location insert failed:', error.message, error.details, error.hint);
     }
   }, [userId]);
 
