@@ -14,6 +14,10 @@ import { Profile } from './pages/Profile';
 import { LiveTracking } from './pages/LiveTracking';
 import { FieldLocations } from './pages/FieldLocations';
 import { FieldLocationDetail } from './pages/FieldLocationDetail';
+import { Collections } from './pages/Collections';
+import { Surveys } from './pages/Surveys';
+import { NewSurvey } from './pages/NewSurvey';
+import { Payments } from './pages/Payments';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -145,6 +149,42 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Attendance />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/collections" 
+                element={
+                  <ProtectedRoute>
+                    <Collections />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/surveys" 
+                element={
+                  <ProtectedRoute>
+                    <Surveys />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/surveys/new" 
+                element={
+                  <ProtectedRoute>
+                    <NewSurvey />
+                  </ProtectedRoute>
+                } 
+              />
+
+              <Route 
+                path="/payments" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <Payments />
                   </ProtectedRoute>
                 } 
               />

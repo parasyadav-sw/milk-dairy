@@ -758,8 +758,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) throw new Error('Unauthenticated');
 
-    const { count } = await supabase.from('farmers').select('*', { count: 'exact', head: true });
-    const farmerId = `FMR-${String((count || 0) + 1).padStart(4, '0')}`;
+    const { data: farmerIdResult, error: farmerIdError } = await supabase
+      .rpc('generate_farmer_id');
+    if (farmerIdError || !farmerIdResult) throw new Error('Failed to generate farmer ID');
+    const farmerId = farmerIdResult;
 
     const cows = data.cowCount ? Number(data.cowCount) : 0;
     const buffalos = data.buffaloCount ? Number(data.buffaloCount) : 0;
@@ -1146,8 +1148,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
         .eq('id', existingFarmer.id);
     } else {
-      const { count } = await supabase.from('farmers').select('*', { count: 'exact', head: true });
-      const farmerId = `FMR-${String((count || 0) + 1).padStart(4, '0')}`;
+      const { data: farmerIdResult, error: farmerIdError } = await supabase
+        .rpc('generate_farmer_id');
+      if (farmerIdError || !farmerIdResult) throw new Error('Failed to generate farmer ID');
+      const farmerId = farmerIdResult;
 
       await supabase
         .from('farmers')
@@ -1158,8 +1162,8 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           gender: 'MALE',
           age: 30,
           village: data.village,
-          taluka: 'Jaipur',
-          district: 'Jaipur',
+          taluka: null,
+          district: null,
           address: data.address,
           animal_type: animalType,
           cow_count: cowCount,
@@ -1336,8 +1340,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (pc.interest_status === 'CONVERTED') throw new Error('Already converted');
 
     // Generate farmer ID
-    const { count } = await supabase.from('farmers').select('*', { count: 'exact', head: true });
-    const farmerId = `FMR-${String((count || 0) + 1).padStart(4, '0')}`;
+    const { data: farmerIdResult, error: farmerIdError } = await supabase
+      .rpc('generate_farmer_id');
+    if (farmerIdError || !farmerIdResult) throw new Error('Failed to generate farmer ID');
+    const farmerId = farmerIdResult;
 
     // Create farmer record
     const farmerPayload: any = {
@@ -1347,8 +1353,8 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       gender: 'MALE',
       age: 30,
       village: pc.village,
-      taluka: 'Jaipur',
-      district: 'Jaipur',
+      taluka: null,
+      district: null,
       address: pc.address,
       animal_type: pc.category === 'CHAIRMAN' ? 'COW' : (pc.cow_count > 0 && pc.buffalo_count > 0 ? 'BOTH' : pc.cow_count > 0 ? 'COW' : 'BUFFALO'),
       cow_count: pc.cow_count || 0,

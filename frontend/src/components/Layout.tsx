@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useDatabase } from '../context/DatabaseContext';
 import { 
   Milk, LayoutDashboard, Users, 
-  CalendarCheck, ClipboardList, LogOut, Database, UserCheck, 
-  ChevronRight, Menu, X, PlusCircle, Download, User, Radio, MapPin
+  ClipboardList, LogOut, UserCheck, 
+  ChevronRight, Menu, X, Download, User, Radio, MapPin,
+  Droplets, FileText, IndianRupee
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -60,7 +61,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const getNavLinks = () => {
     const links = [
       { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/collections', label: 'Milk Collections', icon: <Droplets className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/surveys', label: 'Surveys', icon: <FileText className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/potential-customers', label: 'Potential Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
+      { path: '/payments', label: 'Payments', icon: <IndianRupee className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/employees', label: 'Employees', icon: <ClipboardList className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },

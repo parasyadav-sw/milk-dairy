@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDatabase } from '../context/DatabaseContext';
-import { Milk, Lock, User, Database, UserCheck, AlertTriangle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Milk, Lock, User, AlertTriangle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, error, clearError } = useAuth();
