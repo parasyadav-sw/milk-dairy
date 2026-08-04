@@ -452,6 +452,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (lRes.error) throw lRes.error;
       if (logRes.error) throw logRes.error;
       if (sRes.error) throw sRes.error;
+      if (locRes.error) console.error('employee_locations query error:', locRes.error.message);
+      if (gfRes.error) console.error('geofences query error:', gfRes.error.message);
+      if (gaRes.error) console.error('geofence_alerts query error:', gaRes.error.message);
+      if (nRes.error) console.error('employee_notes query error:', nRes.error.message);
 
       setUsers(uRes.data || []);
       setFarmers((fRes.data || []).map(mapFarmerToJs));

@@ -125,6 +125,9 @@ export function useGPSTracking({
     const { data, error } = await supabase.from('employee_locations').insert(record);
     if (error) {
       console.error('[GPS] Location insert failed:', error.message, error.details, error.hint);
+      setError(`Location upload failed: ${error.message}`);
+    } else {
+      setError(null);
     }
   }, [userId]);
 
