@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { createClient } from '@supabase/supabase-js';
+import { haversineDistance } from '../hooks/useGPSTracking';
 
 // --- DATA TYPES ---
 export interface User {
@@ -10,6 +11,7 @@ export interface User {
   name: string;
   role: 'ADMIN' | 'EMPLOYEE';
   status: 'ACTIVE' | 'INACTIVE';
+  locationSharing?: boolean;
   managerId?: string | null;
   managerName?: string;
   createdAt?: string;
@@ -157,6 +159,7 @@ export interface EmployeeLocation {
   id: number;
   userId: string;
   userName?: string;
+  tripId?: number;
   latitude: number;
   longitude: number;
   accuracy: number;
@@ -199,6 +202,24 @@ export interface EmployeeNote {
   timestamp: string;
 }
 
+export interface LocationTrip {
+  id: number;
+  userId: string;
+  userName?: string;
+  startedAt: string;
+  endedAt?: string;
+  startLat?: number;
+  startLng?: number;
+  startLocationName?: string;
+  endLat?: number;
+  endLng?: number;
+  endLocationName?: string;
+  totalDistanceKm: number;
+  pointCount: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'ABANDONED';
+  createdAt: string;
+}
+
 interface DatabaseContextType {
   isApiMode: boolean;
   setApiMode: (val: boolean) => void;
@@ -215,6 +236,7 @@ interface DatabaseContextType {
   geofences: Geofence[];
   geofenceAlerts: GeofenceAlert[];
   notes: EmployeeNote[];
+  trips: LocationTrip[];
   refreshData: () => Promise<void>;
   
   // Mutating Operations
@@ -241,12 +263,19 @@ interface DatabaseContextType {
   // Tracking Operations
   fetchLocations: () => Promise<void>;
   fetchLocationHistory: (userId: string, date: string) => Promise<EmployeeLocation[]>;
+  fetchLocationHistoryByDateRange: (userId: string, startDate: string, endDate: string) => Promise<EmployeeLocation[]>;
   addGeofence: (data: Omit<Geofence, 'id' | 'createdAt'>) => Promise<Geofence>;
   deleteGeofence: (id: number) => Promise<void>;
   refreshLocations: () => Promise<void>;
   refreshGeofenceAlerts: () => Promise<void>;
   sendNote: (noteText: string, latitude?: number, longitude?: number) => Promise<EmployeeNote>;
   fetchNotes: () => Promise<void>;
+  updateLocationSharing: (userId: string, isSharing: boolean) => Promise<void>;
+  createTrip: (userId: string, userName: string, startLat?: number, startLng?: number) => Promise<LocationTrip>;
+  closeTrip: (tripId: number, endLat?: number, endLng?: number) => Promise<void>;
+  fetchTrips: (filters?: { userId?: string; startDate?: string; endDate?: string }) => Promise<LocationTrip[]>;
+  fetchTripLocations: (tripId: number) => Promise<EmployeeLocation[]>;
+  fetchActiveTrip: (userId: string) => Promise<LocationTrip | null>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -395,6 +424,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [geofenceAlerts, setGeofenceAlerts] = useState<GeofenceAlert[]>([]);
   const [notes, setNotes] = useState<EmployeeNote[]>([]);
+  const [trips, setTrips] = useState<LocationTrip[]>([]);
 
   const refreshData = async () => {
     try {
@@ -1356,6 +1386,31 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
+  const fetchLocationHistoryByDateRange = async (userId: string, startDate: string, endDate: string): Promise<EmployeeLocation[]> => {
+    const start = `${startDate}T00:00:00`;
+    const end = `${endDate}T23:59:59`;
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('*, profiles(name)')
+      .eq('user_id', userId)
+      .gte('timestamp', start)
+      .lte('timestamp', end)
+      .order('timestamp', { ascending: true });
+    if (error || !data) return [];
+    return data.map((l: any) => ({
+      id: Number(l.id),
+      userId: l.user_id,
+      userName: l.profiles?.name,
+      latitude: l.latitude,
+      longitude: l.longitude,
+      accuracy: l.accuracy,
+      speed: l.speed,
+      batteryLevel: l.battery_level,
+      timestamp: l.timestamp,
+      note: l.note || undefined,
+    }));
+  };
+
   const addGeofence = async (data: Omit<Geofence, 'id' | 'createdAt'>): Promise<Geofence> => {
     const { data: newGeo, error } = await supabase
       .from('geofences')
@@ -1460,6 +1515,203 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const updateLocationSharing = async (userId: string, isSharing: boolean) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ location_sharing: isSharing })
+      .eq('id', userId);
+    if (error) throw error;
+    // Also update local users state so the change is reflected immediately
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, locationSharing: isSharing } : u));
+  };
+
+  // --- Trip Operations ---
+
+  const fetchActiveTrip = async (userId: string): Promise<LocationTrip | null> => {
+    const { data, error } = await supabase
+      .from('location_trips')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      userId: data.user_id,
+      userName: data.user_name,
+      startedAt: data.started_at,
+      endedAt: data.ended_at,
+      startLat: data.start_lat,
+      startLng: data.start_lng,
+      startLocationName: data.start_location_name,
+      endLat: data.end_lat,
+      endLng: data.end_lng,
+      endLocationName: data.end_location_name,
+      totalDistanceKm: data.total_distance_km || 0,
+      pointCount: data.point_count || 0,
+      status: data.status,
+      createdAt: data.created_at,
+    };
+  };
+
+  const createTrip = async (userId: string, userName: string, startLat?: number, startLng?: number): Promise<LocationTrip> => {
+    // Reverse-geocode the start location
+    let startLocationName: string | undefined;
+    if (startLat && startLng) {
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${startLat}&lon=${startLng}&zoom=18&addressdetails=1`
+        );
+        const geo = await resp.json();
+        startLocationName = geo.display_name?.split(',').slice(0, 3).join(',') || undefined;
+      } catch {}
+    }
+
+    const { data, error } = await supabase
+      .from('location_trips')
+      .insert({
+        user_id: userId,
+        user_name: userName,
+        started_at: new Date().toISOString(),
+        start_lat: startLat || null,
+        start_lng: startLng || null,
+        start_location_name: startLocationName || null,
+        status: 'ACTIVE',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    const trip: LocationTrip = {
+      id: data.id,
+      userId: data.user_id,
+      userName: data.user_name,
+      startedAt: data.started_at,
+      endedAt: data.ended_at,
+      startLat: data.start_lat,
+      startLng: data.start_lng,
+      startLocationName: data.start_location_name,
+      endLat: data.end_lat,
+      endLng: data.end_lng,
+      endLocationName: data.end_location_name,
+      totalDistanceKm: data.total_distance_km || 0,
+      pointCount: data.point_count || 0,
+      status: data.status,
+      createdAt: data.created_at,
+    };
+    setTrips(prev => [trip, ...prev]);
+    return trip;
+  };
+
+  const closeTrip = async (tripId: number, endLat?: number, endLng?: number) => {
+    // Reverse-geocode the end location
+    let endLocationName: string | undefined;
+    if (endLat && endLng) {
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${endLat}&lon=${endLng}&zoom=18&addressdetails=1`
+        );
+        const geo = await resp.json();
+        endLocationName = geo.display_name?.split(',').slice(0, 3).join(',') || undefined;
+      } catch {}
+    }
+
+    // Compute total distance and point count from employee_locations
+    const { data: locs } = await supabase
+      .from('employee_locations')
+      .select('latitude, longitude')
+      .eq('trip_id', tripId)
+      .order('timestamp', { ascending: true });
+
+    let totalDistance = 0;
+    if (locs && locs.length > 1) {
+      for (let i = 1; i < locs.length; i++) {
+        totalDistance += haversineDistance(
+          locs[i - 1].latitude, locs[i - 1].longitude,
+          locs[i].latitude, locs[i].longitude
+        );
+      }
+    }
+
+    const { error } = await supabase
+      .from('location_trips')
+      .update({
+        ended_at: new Date().toISOString(),
+        end_lat: endLat || null,
+        end_lng: endLng || null,
+        end_location_name: endLocationName || null,
+        total_distance_km: Math.round(totalDistance * 100) / 100,
+        point_count: locs?.length || 0,
+        status: 'COMPLETED',
+      })
+      .eq('id', tripId);
+    if (error) throw error;
+    setTrips(prev => prev.map(t => t.id === tripId ? {
+      ...t,
+      endedAt: new Date().toISOString(),
+      endLat: endLat,
+      endLng: endLng,
+      endLocationName: endLocationName,
+      totalDistanceKm: Math.round(totalDistance * 100) / 100,
+      pointCount: locs?.length || 0,
+      status: 'COMPLETED',
+    } : t));
+  };
+
+  const fetchTrips = async (filters?: { userId?: string; startDate?: string; endDate?: string }): Promise<LocationTrip[]> => {
+    let query = supabase
+      .from('location_trips')
+      .select('*')
+      .order('started_at', { ascending: false });
+
+    if (filters?.userId) query = query.eq('user_id', filters.userId);
+    if (filters?.startDate) query = query.gte('started_at', `${filters.startDate}T00:00:00`);
+    if (filters?.endDate) query = query.lte('started_at', `${filters.endDate}T23:59:59`);
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data.map((t: any) => ({
+      id: t.id,
+      userId: t.user_id,
+      userName: t.user_name,
+      startedAt: t.started_at,
+      endedAt: t.ended_at,
+      startLat: t.start_lat,
+      startLng: t.start_lng,
+      startLocationName: t.start_location_name,
+      endLat: t.end_lat,
+      endLng: t.end_lng,
+      endLocationName: t.end_location_name,
+      totalDistanceKm: t.total_distance_km || 0,
+      pointCount: t.point_count || 0,
+      status: t.status,
+      createdAt: t.created_at,
+    }));
+  };
+
+  const fetchTripLocations = async (tripId: number): Promise<EmployeeLocation[]> => {
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('*, profiles(name)')
+      .eq('trip_id', tripId)
+      .order('timestamp', { ascending: true });
+    if (error || !data) return [];
+    return data.map((l: any) => ({
+      id: Number(l.id),
+      userId: l.user_id,
+      userName: l.profiles?.name,
+      tripId: l.trip_id,
+      latitude: l.latitude,
+      longitude: l.longitude,
+      accuracy: l.accuracy,
+      speed: l.speed,
+      batteryLevel: l.battery_level,
+      timestamp: l.timestamp,
+      note: l.note || undefined,
+    }));
+  };
+
   return (
     <DatabaseContext.Provider value={{
       isApiMode,
@@ -1477,6 +1729,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       geofences,
       geofenceAlerts,
       notes,
+      trips,
       refreshData,
       addUser,
       updateUser,
@@ -1497,12 +1750,19 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       convertToCustomer,
       fetchLocations,
       fetchLocationHistory,
+      fetchLocationHistoryByDateRange,
       addGeofence,
       deleteGeofence,
       refreshLocations,
       refreshGeofenceAlerts,
       sendNote,
       fetchNotes,
+      updateLocationSharing,
+      createTrip,
+      closeTrip,
+      fetchTrips,
+      fetchTripLocations,
+      fetchActiveTrip,
     }}>
       {children}
     </DatabaseContext.Provider>

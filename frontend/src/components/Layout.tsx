@@ -5,7 +5,7 @@ import { useDatabase } from '../context/DatabaseContext';
 import { 
   Milk, LayoutDashboard, Users, 
   CalendarCheck, ClipboardList, LogOut, Database, UserCheck, 
-  ChevronRight, Menu, X, PlusCircle, Download, User, Radio
+  ChevronRight, Menu, X, PlusCircle, Download, User, Radio, MapPin
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -14,9 +14,34 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout, login } = useAuth();
-  const { isApiMode, setApiMode } = useDatabase();
+  const { isApiMode, setApiMode, updateLocationSharing, fetchActiveTrip, closeTrip } = useDatabase();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = async () => {
+    if (user?.id && user.role === 'EMPLOYEE') {
+      try {
+        await updateLocationSharing(user.id, false);
+        const activeTrip = await fetchActiveTrip(user.id);
+        if (activeTrip) {
+          let endLat: number | undefined;
+          let endLng: number | undefined;
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false, timeout: 3000, maximumAge: 60000,
+              });
+            });
+            endLat = pos.coords.latitude;
+            endLng = pos.coords.longitude;
+          } catch {}
+          await closeTrip(activeTrip.id, endLat, endLng);
+        }
+      } catch {}
+    }
+    localStorage.removeItem(`locationSharing_${user?.id}`);
+    logout();
+  };
   
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -59,6 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { path: '/customers', label: 'Customers', icon: <Users className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/attendance', label: 'Attendance', icon: <UserCheck className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
       { path: '/live-tracking', label: 'Live Tracking', icon: <Radio className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
+      { path: '/field-locations', label: 'Field Locations', icon: <MapPin className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/export', label: 'Export', icon: <Download className="w-[18px] h-[18px]" />, roles: ['ADMIN'] },
       { path: '/profile', label: 'Profile', icon: <User className="w-[18px] h-[18px]" />, roles: ['ADMIN', 'EMPLOYEE'] },
     ];
@@ -117,7 +143,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <div className="p-3 border-t border-warm-100 space-y-2">
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-body-sm font-medium text-error hover:bg-red-50 transition-all duration-200"
         >
           <LogOut className="w-[18px] h-[18px]" />
@@ -186,7 +212,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <p className="text-body-sm text-muted mt-0.5">{user.email}</p>
                       </div>
                       <button
-                        onClick={() => { setProfileOpen(false); logout(); }}
+                        onClick={() => { setProfileOpen(false); handleLogout(); }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-body font-medium text-error hover:bg-red-50 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />

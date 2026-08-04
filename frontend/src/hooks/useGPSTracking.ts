@@ -15,6 +15,7 @@ interface UseGPSTrackingOptions {
   intervalMs?: number;
   userId: string;
   note?: string;
+  tripId?: number | null;
 }
 
 interface UseGPSTrackingResult {
@@ -60,6 +61,7 @@ export function useGPSTracking({
   intervalMs = UPDATE_INTERVAL_DEFAULT,
   userId,
   note,
+  tripId,
 }: UseGPSTrackingOptions): UseGPSTrackingResult {
   const [isTracking, setIsTracking] = useState(false);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unavailable'>('prompt');
@@ -104,6 +106,7 @@ export function useGPSTracking({
     try {
       await supabase.from('employee_locations').insert({
         user_id: userId,
+        trip_id: tripId || null,
         latitude: loc.latitude,
         longitude: loc.longitude,
         accuracy: loc.accuracy,
@@ -115,7 +118,7 @@ export function useGPSTracking({
     } catch (err) {
       console.error('Failed to upload location:', err);
     }
-  }, [userId]);
+  }, [userId, tripId]);
 
   const handlePosition = useCallback(async (position: GeolocationPosition) => {
     const now = Date.now();

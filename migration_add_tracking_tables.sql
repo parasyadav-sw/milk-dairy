@@ -1,10 +1,34 @@
--- Migration: Add live tracking & notes tables
+-- Migration: Add live tracking, notes, and trip history tables
 -- Run this SQL in your Supabase SQL Editor if the tables don't already exist.
 
--- 1. Employee Locations Table (live GPS tracking)
+-- 1. Location Trips Table (each share→stop cycle is a permanent trip record)
+create table if not exists public.location_trips (
+  id bigserial primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_name text,
+  started_at timestamp with time zone not null,
+  ended_at timestamp with time zone,
+  start_lat double precision,
+  start_lng double precision,
+  start_location_name text,
+  end_lat double precision,
+  end_lng double precision,
+  end_location_name text,
+  total_distance_km double precision default 0,
+  point_count integer default 0,
+  status text default 'ACTIVE' check (status in ('ACTIVE', 'COMPLETED', 'ABANDONED')) not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_location_trips_user_id on public.location_trips(user_id);
+create index if not exists idx_location_trips_started_at on public.location_trips(started_at desc);
+create index if not exists idx_location_trips_status on public.location_trips(status);
+
+-- 2. Employee Locations Table (live GPS tracking)
 create table if not exists public.employee_locations (
   id bigserial primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  trip_id bigint references public.location_trips(id) on delete set null,
   latitude double precision not null,
   longitude double precision not null,
   accuracy double precision not null,
@@ -16,7 +40,15 @@ create table if not exists public.employee_locations (
 );
 
 create index if not exists idx_employee_locations_user_id on public.employee_locations(user_id);
+create index if not exists idx_employee_locations_trip_id on public.employee_locations(trip_id);
 create index if not exists idx_employee_locations_timestamp on public.employee_locations(timestamp desc);
+
+-- 3. Add trip_id column to existing employee_locations if missing
+do $$ begin
+  alter table public.employee_locations add column trip_id bigint references public.location_trips(id) on delete set null;
+exception when duplicate_column then null;
+end $$;
+create index if not exists idx_employee_locations_trip_id on public.employee_locations(trip_id);
 
 -- 2. Geofences Table
 create table if not exists public.geofences (
@@ -130,5 +162,25 @@ end $$;
 do $$ begin
   create policy "Allow all authenticated users full access on employee_notes"
     on public.employee_notes for all to authenticated using (true) with check (true);
+exception when duplicate_object then null;
+end $$;
+
+-- 9. Add location_sharing column to profiles for persistence
+do $$ begin
+  alter table public.profiles add column location_sharing boolean default false not null;
+exception when duplicate_column then null;
+end $$;
+
+-- 10. Enable RLS for location_trips
+alter table public.location_trips enable row level security;
+do $$ begin
+  create policy "Allow all authenticated users full access on location_trips"
+    on public.location_trips for all to authenticated using (true) with check (true);
+exception when duplicate_object then null;
+end $$;
+
+-- Enable Realtime for location_trips
+do $$ begin
+  alter publication supabase_realtime add table public.location_trips;
 exception when duplicate_object then null;
 end $$;

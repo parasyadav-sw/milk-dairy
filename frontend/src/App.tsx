@@ -12,6 +12,8 @@ import { PotentialCustomers } from './pages/PotentialCustomers';
 import { Export } from './pages/Export';
 import { Profile } from './pages/Profile';
 import { LiveTracking } from './pages/LiveTracking';
+import { FieldLocations } from './pages/FieldLocations';
+import { FieldLocationDetail } from './pages/FieldLocationDetail';
 
 // Route Guard to verify active JWT sessions
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -115,6 +117,24 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <LiveTracking />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/field-locations" 
+              element={
+                <ProtectedRoute>
+                  <FieldLocations />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/field-locations/employee/:userId" 
+              element={
+                <ProtectedRoute>
+                  <FieldLocationDetail />
                 </ProtectedRoute>
               } 
             />

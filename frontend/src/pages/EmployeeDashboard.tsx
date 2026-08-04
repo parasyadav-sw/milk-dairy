@@ -8,40 +8,60 @@ import { Toast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const EmployeeDashboard: React.FC = () => {
-  const { collections, attendance, surveys, clockIn, clockOut, sendNote } = useDatabase();
+  const { collections, attendance, surveys, clockIn, clockOut, sendNote, updateLocationSharing, createTrip, closeTrip, fetchActiveTrip } = useDatabase();
   const { user } = useAuth();
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [timerVal, setTimerVal] = useState('00:00:00');
+  const [activeTripId, setActiveTripId] = useState<number | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const myAttendanceToday = attendance.find(a => a.userId === user?.id && a.date === todayStr);
   const isClockedIn = !!(myAttendanceToday && !myAttendanceToday.clockOut);
 
-  // Location sharing — persisted to localStorage per user so it survives refresh
+  // Location sharing — restored from localStorage (instant) then synced with database (authoritative)
   const [shareLocation, setShareLocation] = useState(() => {
-    if (user?.id && localStorage.getItem(`locationSharing_${user.id}`) === 'true') {
-      return true;
-    }
+    if (user?.id && localStorage.getItem(`locationSharing_${user.id}`) === 'true') return true;
+    if (user?.locationSharing) return true;
     return false;
   });
   const [locationNote, setLocationNote] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Sync shareLocation when user changes (login/logout)
+  // When the user profile loads/updates, sync shareLocation with the database value
   useEffect(() => {
-    if (user?.id && localStorage.getItem(`locationSharing_${user.id}`) === 'true') {
-      setShareLocation(true);
-    } else {
-      setShareLocation(false);
+    if (!user?.id) return;
+    const dbValue = !!user.locationSharing;
+    const cachedValue = localStorage.getItem(`locationSharing_${user.id}`) === 'true';
+    // Database is the source of truth; localStorage is a fast-path cache
+    if (dbValue !== cachedValue) {
+      localStorage.setItem(`locationSharing_${user.id}`, String(dbValue));
     }
-  }, [user?.id]);
+    setShareLocation(dbValue);
+  }, [user?.id, user?.locationSharing]);
+
+  // Restore active trip from DB on mount or when sharing state changes
+  useEffect(() => {
+    if (!user?.id) return;
+    if (shareLocation) {
+      fetchActiveTrip(user.id).then(trip => {
+        if (trip) {
+          setActiveTripId(trip.id);
+        } else {
+          setActiveTripId(null);
+        }
+      });
+    } else {
+      setActiveTripId(null);
+    }
+  }, [user?.id, shareLocation]);
 
   const { isTracking, permissionState, error: gpsError } = useGPSTracking({
     enabled: shareLocation && isClockedIn && !!user?.id,
     intervalMs: 15000,
     userId: user?.id || '',
     note: locationNote,
+    tripId: activeTripId,
   });
   
   const triggerToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); };
@@ -103,27 +123,38 @@ export const EmployeeDashboard: React.FC = () => {
 
   // Show GPS errors as toast
   useEffect(() => {
-    if (gpsError) {
+    if (gpsError && user?.id) {
       triggerToast(gpsError, 'error');
       setShareLocation(false);
-      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
+      localStorage.removeItem(`locationSharing_${user.id}`);
+      try {
+        updateLocationSharing(user.id, false);
+        if (activeTripId) {
+          closeTrip(activeTripId).then(() => setActiveTripId(null));
+        }
+      } catch {}
     }
   }, [gpsError, user?.id]);
 
   // Stop sharing if clocked out
   useEffect(() => {
-    if (shareLocation && !isClockedIn) {
+    if (shareLocation && !isClockedIn && user?.id) {
       setShareLocation(false);
-      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
+      localStorage.removeItem(`locationSharing_${user.id}`);
       setLocationNote('');
       triggerToast('Location sharing stopped (clocked out)', 'error');
+      try {
+        updateLocationSharing(user.id, false);
+        if (activeTripId) {
+          closeTrip(activeTripId).then(() => setActiveTripId(null));
+        }
+      } catch {}
     }
   }, [isClockedIn, shareLocation, user?.id]);
 
-  // Clear sharing state on logout
+  // Clear sharing state on logout (database already cleared by Layout before logout)
   useEffect(() => {
     if (!user) {
-      // Clean up all location sharing keys (we can't know the old user ID at this point)
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('locationSharing_')) {
           localStorage.removeItem(key);
@@ -132,18 +163,57 @@ export const EmployeeDashboard: React.FC = () => {
     }
   }, [user]);
 
-  const handleToggleLocation = () => {
+  const handleToggleLocation = async () => {
+    if (!user?.id) return;
     if (shareLocation) {
+      // Stop sharing — close the active trip
       setShareLocation(false);
-      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
+      localStorage.removeItem(`locationSharing_${user.id}`);
       setLocationNote('');
+      try {
+        await updateLocationSharing(user.id, false);
+        if (activeTripId) {
+          // Get current position for end location
+          let endLat: number | undefined;
+          let endLng: number | undefined;
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false, timeout: 5000, maximumAge: 30000,
+              });
+            });
+            endLat = pos.coords.latitude;
+            endLng = pos.coords.longitude;
+          } catch {}
+          await closeTrip(activeTripId, endLat, endLng);
+          setActiveTripId(null);
+        }
+      } catch {}
     } else {
       if (!isClockedIn) {
         triggerToast('Clock in first to share location', 'error');
         return;
       }
+      // Start sharing — create a new trip
       setShareLocation(true);
-      if (user?.id) localStorage.setItem(`locationSharing_${user.id}`, 'true');
+      localStorage.setItem(`locationSharing_${user.id}`, 'true');
+      try {
+        await updateLocationSharing(user.id, true);
+        // Get current position for start location
+        let startLat: number | undefined;
+        let startLng: number | undefined;
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false, timeout: 5000, maximumAge: 30000,
+            });
+          });
+          startLat = pos.coords.latitude;
+          startLng = pos.coords.longitude;
+        } catch {}
+        const trip = await createTrip(user.id, user.name, startLat, startLng);
+        setActiveTripId(trip.id);
+      } catch {}
     }
   };
 

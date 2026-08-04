@@ -9,6 +9,7 @@ create table public.profiles (
   name text not null,
   role text check (role in ('ADMIN', 'EMPLOYEE')) not null,
   status text default 'ACTIVE' check (status in ('ACTIVE', 'INACTIVE')) not null,
+  location_sharing boolean default false not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -169,6 +170,7 @@ create table public.surveys (
 create table public.employee_locations (
   id bigserial primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  trip_id bigint references public.location_trips(id) on delete set null,
   latitude double precision not null,
   longitude double precision not null,
   accuracy double precision not null,
@@ -180,7 +182,31 @@ create table public.employee_locations (
 );
 
 create index idx_employee_locations_user_id on public.employee_locations(user_id);
+create index idx_employee_locations_trip_id on public.employee_locations(trip_id);
 create index idx_employee_locations_timestamp on public.employee_locations(timestamp desc);
+
+-- 11b. Location Trips Table (each share→stop cycle is a permanent trip record)
+create table public.location_trips (
+  id bigserial primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_name text,
+  started_at timestamp with time zone not null,
+  ended_at timestamp with time zone,
+  start_lat double precision,
+  start_lng double precision,
+  start_location_name text,
+  end_lat double precision,
+  end_lng double precision,
+  end_location_name text,
+  total_distance_km double precision default 0,
+  point_count integer default 0,
+  status text default 'ACTIVE' check (status in ('ACTIVE', 'COMPLETED', 'ABANDONED')) not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index idx_location_trips_user_id on public.location_trips(user_id);
+create index idx_location_trips_started_at on public.location_trips(started_at desc);
+create index idx_location_trips_status on public.location_trips(status);
 
 -- 12. Geofences Table
 create table public.geofences (
@@ -297,3 +323,11 @@ create policy "Allow all authenticated users full access on geofences" on public
 create policy "Allow all authenticated users full access on geofence_alerts" on public.geofence_alerts for all to authenticated using (true) with check (true);
 create policy "Allow all authenticated users full access on potential_customers" on public.potential_customers for all to authenticated using (true) with check (true);
 create policy "Allow all authenticated users full access on employee_notes" on public.employee_notes for all to authenticated using (true) with check (true);
+alter table public.location_trips enable row level security;
+create policy "Allow all authenticated users full access on location_trips" on public.location_trips for all to authenticated using (true) with check (true);
+
+-- Enable Realtime for location_trips (admin gets live trip updates)
+do $$ begin
+  alter publication supabase_realtime add table public.location_trips;
+exception when duplicate_object then null;
+end $$;
