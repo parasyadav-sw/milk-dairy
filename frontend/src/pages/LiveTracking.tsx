@@ -161,7 +161,7 @@ export const LiveTracking: React.FC = () => {
           <h1 className="page-title">Live Tracking</h1>
           <p className="page-subtitle">Monitor employee locations, routes, and geofences in real-time</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setViewMode('live')}
             className={`px-3 py-2 rounded-xl text-body-sm font-medium transition-all ${viewMode === 'live' ? 'bg-primary-700 text-white shadow-glow' : 'bg-white border border-warm-200 text-warm-600 hover:bg-warm-50'}`}

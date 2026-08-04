@@ -312,7 +312,7 @@ export const Employees: React.FC = () => {
                   <p className="text-body-sm text-muted">EMP-{selectedEmployee.username || selectedEmployee.id.substring(0, 8)}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="card p-3">
                   <p className="text-label text-muted mb-1">Username</p>
                   <p className="text-body font-medium text-foreground">{selectedEmployee.username}</p>

@@ -891,7 +891,7 @@ export const Export: React.FC = () => {
               <div className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedCardFilters[report.type] ? 'max-h-[450px] opacity-100 border-t border-warm-100 pt-3 mt-1' : 'max-h-0 opacity-0 pointer-events-none'}`}>
                 {/* Customer Filters */}
                 {report.type === 'customers' && (
-                  <div className="grid grid-cols-2 gap-2 text-body-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
                     <div className="col-span-2">
                       <label className="label mb-0.5 text-caption">Farmer Name</label>
                       <input type="text" className="input py-1.5 text-xs w-full" placeholder="Farmer name" value={custFarmerName} onChange={e => setCustFarmerName(e.target.value)} />
@@ -943,7 +943,7 @@ export const Export: React.FC = () => {
 
                 {/* Employee Filters */}
                 {report.type === 'employees' && (
-                  <div className="grid grid-cols-2 gap-2 text-body-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
                     <div>
                       <label className="label mb-0.5 text-caption">Employee Name</label>
                       <input type="text" className="input py-1.5 text-xs w-full" placeholder="Employee name" value={empName} onChange={e => setEmpName(e.target.value)} />
@@ -977,7 +977,7 @@ export const Export: React.FC = () => {
 
                 {/* Survey Filters */}
                 {report.type === 'surveys' && (
-                  <div className="grid grid-cols-2 gap-2 text-body-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
                     <div>
                       <label className="label mb-0.5 text-caption">Survey Date</label>
                       <input type="date" className="input py-1.5 text-xs w-full" value={srvDate} onChange={e => setSrvDate(e.target.value)} />
@@ -1033,7 +1033,7 @@ export const Export: React.FC = () => {
 
                 {/* Attendance Filters */}
                 {report.type === 'attendance' && (
-                  <div className="grid grid-cols-2 gap-2 text-body-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
                     <div>
                       <label className="label mb-0.5 text-caption">Single Date</label>
                       <input type="date" className="input py-1.5 text-xs w-full" value={attSingleDate} onChange={e => setAttSingleDate(e.target.value)} />

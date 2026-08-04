@@ -491,7 +491,7 @@ export const PotentialCustomers: React.FC = () => {
                   </h4>
 
                   {/* Editable inputs */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <label className="label">Cow Count</label>
                       <input type="number" min="0" value={form.cowCount}
@@ -519,7 +519,7 @@ export const PotentialCustomers: React.FC = () => {
                   </div>
 
                   {/* Computed totals - per type */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center justify-between p-3 bg-primary-50 rounded-xl">
                       <span className="text-body-sm text-primary-700 font-medium">Total Cow Milk</span>
                       <span className="text-data font-display text-primary-800">
@@ -535,7 +535,7 @@ export const PotentialCustomers: React.FC = () => {
                   </div>
 
                   {/* Summary row */}
-                  <div className="grid grid-cols-3 gap-3 bg-warm-50 p-3 rounded-xl text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-warm-50 p-3 rounded-xl text-center">
                     <div>
                       <span className="label text-xs text-muted block">Total Animals</span>
                       <span className="text-body font-bold text-primary-700">{(parseInt(form.cowCount) || 0) + (parseInt(form.buffaloCount) || 0)}</span>
@@ -652,7 +652,7 @@ export const PotentialCustomers: React.FC = () => {
               {selectedItem.category === 'FARMER' && (
                 <div className="border-t border-warm-100 pt-4">
                   <span className="label text-muted block mb-3">Animal & Milk Details</span>
-                  <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                     <div className="p-3 bg-primary-50 rounded-xl text-center">
                       <span className="label text-xs text-muted block">Cows</span>
                       <span className="text-data-lg font-display text-primary-700">{selectedItem.cowCount}</span>
@@ -666,7 +666,7 @@ export const PotentialCustomers: React.FC = () => {
                       <span className="text-data-lg font-display text-primary-700">{selectedItem.totalAnimals}</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <div className="flex items-center justify-between p-3 bg-primary-50 rounded-xl">
                       <span className="text-body-sm text-primary-700 font-medium">Cow Milk</span>
                       <span className="text-data font-display text-primary-800">{selectedItem.totalCowMilk.toFixed(1)} <span className="text-body-xs text-primary-600">L/day</span></span>
@@ -676,7 +676,7 @@ export const PotentialCustomers: React.FC = () => {
                       <span className="text-data font-display text-forest-800">{selectedItem.totalBuffaloMilk.toFixed(1)} <span className="text-body-xs text-forest-600">L/day</span></span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 bg-warm-50 p-3 rounded-xl text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-warm-50 p-3 rounded-xl text-center">
                     <div>
                       <span className="label text-xs text-muted block">Cow Yield</span>
                       <span className="text-body font-bold text-primary-700">{selectedItem.cowMilkYield > 0 ? `${selectedItem.cowMilkYield} L` : '—'}</span>

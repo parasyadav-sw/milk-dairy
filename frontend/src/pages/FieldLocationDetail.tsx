@@ -289,7 +289,7 @@ export const FieldLocationDetail: React.FC = () => {
       )}
 
       {/* Map */}
-      <div className="card overflow-hidden" style={{ height: '450px' }}>
+      <div className="card overflow-hidden h-[50vh] min-h-[300px] max-h-[500px]">
         {allLocations.length > 0 ? (
           <MapContainer
             center={[allLocations[0].latitude, allLocations[0].longitude]}

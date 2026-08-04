@@ -146,27 +146,27 @@ export const Customers: React.FC = () => {
           <ModalBody className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2"><label className="label">Full name *</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="input" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><label className="label">Mobile *</label><input type="tel" required maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">Alt mobile</label><input type="tel" maxLength={10} value={altMobile} onChange={(e) => setAltMobile(e.target.value)} className="input" /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 space-y-2"><label className="label">Aadhaar</label><input type="text" value={aadhaar} onChange={(e) => setAadhaar(e.target.value)} className="input" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 space-y-2"><label className="label">Aadhaar</label><input type="text" value={aadhaar} onChange={(e) => setAadhaar(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">Age *</label><input type="number" required value={age} onChange={(e) => setAge(e.target.value)} className="input" /></div>
               </div>
-              <div className="grid grid-cols-3 gap-3 border-t border-warm-100 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-warm-100 pt-4">
                 <div className="space-y-2"><label className="label">Village *</label><input type="text" required value={village} onChange={(e) => setVillage(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">Taluka *</label><input type="text" required value={taluka} onChange={(e) => setTaluka(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">District *</label><input type="text" required value={district} onChange={(e) => setDistrict(e.target.value)} className="input" /></div>
               </div>
               <div className="space-y-2"><label className="label">Address *</label><input type="text" required value={address} onChange={(e) => setAddress(e.target.value)} className="input" /></div>
-              <div className="grid grid-cols-3 gap-3 border-t border-warm-100 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-warm-100 pt-4">
                 <div className="space-y-2"><label className="label">Animal type</label>
                   <select value={animalType} onChange={(e) => setAnimalType(e.target.value)} className="select"><option value="COW">Cow</option><option value="BUFFALO">Buffalo</option><option value="BOTH">Both</option></select></div>
                 <div className="space-y-2"><label className="label">Cows</label><input type="number" value={cowCount} onChange={(e) => setCowCount(e.target.value)} className="input" /></div>
                 <div className="space-y-2"><label className="label">Buffalos</label><input type="number" value={buffaloCount} onChange={(e) => setBuffaloCount(e.target.value)} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><label className="label">Cow Milk Yield (L/animal)</label><input type="number" step="0.1" value={cowMilkYield} onChange={(e) => setCowMilkYield(e.target.value)} className="input" placeholder="e.g. 6.5" /></div>
                 <div className="space-y-2"><label className="label">Buffalo Milk Yield (L/animal)</label><input type="number" step="0.1" value={buffaloMilkYield} onChange={(e) => setBuffaloMilkYield(e.target.value)} className="input" placeholder="e.g. 8.0" /></div>
               </div>
@@ -193,7 +193,7 @@ export const Customers: React.FC = () => {
           <ModalBody className="pt-0">
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
                   <Phone className="w-4 h-4 text-muted" />
                   <div><span className="label text-muted block">Mobile</span><span className="text-body font-medium text-foreground">{selectedFarmer.mobile}</span></div>
@@ -206,7 +206,7 @@ export const Customers: React.FC = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
                   <User className="w-4 h-4 text-muted" />
                   <div><span className="label text-muted block">Gender</span><span className="text-body font-medium text-foreground">{selectedFarmer.gender}</span></div>
@@ -232,7 +232,7 @@ export const Customers: React.FC = () => {
 
               <div className="border-t border-warm-100 pt-4">
                 <span className="label text-muted block mb-3">Livestock & Milk Yield</span>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="p-3 bg-primary-50 rounded-xl text-center flex flex-col justify-center">
                     <span className="label text-muted block">Type</span>
                     <span className="text-body font-medium text-primary-700 mt-1">{selectedFarmer.animalType}</span>
