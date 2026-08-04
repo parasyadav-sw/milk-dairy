@@ -18,10 +18,24 @@ export const EmployeeDashboard: React.FC = () => {
   const myAttendanceToday = attendance.find(a => a.userId === user?.id && a.date === todayStr);
   const isClockedIn = !!(myAttendanceToday && !myAttendanceToday.clockOut);
 
-  // Location sharing
-  const [shareLocation, setShareLocation] = useState(false);
+  // Location sharing — persisted to localStorage per user so it survives refresh
+  const [shareLocation, setShareLocation] = useState(() => {
+    if (user?.id && localStorage.getItem(`locationSharing_${user.id}`) === 'true') {
+      return true;
+    }
+    return false;
+  });
   const [locationNote, setLocationNote] = useState('');
   const [sending, setSending] = useState(false);
+
+  // Sync shareLocation when user changes (login/logout)
+  useEffect(() => {
+    if (user?.id && localStorage.getItem(`locationSharing_${user.id}`) === 'true') {
+      setShareLocation(true);
+    } else {
+      setShareLocation(false);
+    }
+  }, [user?.id]);
 
   const { isTracking, permissionState, error: gpsError } = useGPSTracking({
     enabled: shareLocation && isClockedIn && !!user?.id,
@@ -92,21 +106,36 @@ export const EmployeeDashboard: React.FC = () => {
     if (gpsError) {
       triggerToast(gpsError, 'error');
       setShareLocation(false);
+      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
     }
-  }, [gpsError]);
+  }, [gpsError, user?.id]);
 
   // Stop sharing if clocked out
   useEffect(() => {
     if (shareLocation && !isClockedIn) {
       setShareLocation(false);
+      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
       setLocationNote('');
       triggerToast('Location sharing stopped (clocked out)', 'error');
     }
-  }, [isClockedIn, shareLocation]);
+  }, [isClockedIn, shareLocation, user?.id]);
+
+  // Clear sharing state on logout
+  useEffect(() => {
+    if (!user) {
+      // Clean up all location sharing keys (we can't know the old user ID at this point)
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('locationSharing_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  }, [user]);
 
   const handleToggleLocation = () => {
     if (shareLocation) {
       setShareLocation(false);
+      if (user?.id) localStorage.removeItem(`locationSharing_${user.id}`);
       setLocationNote('');
     } else {
       if (!isClockedIn) {
@@ -114,6 +143,7 @@ export const EmployeeDashboard: React.FC = () => {
         return;
       }
       setShareLocation(true);
+      if (user?.id) localStorage.setItem(`locationSharing_${user.id}`, 'true');
     }
   };
 
@@ -153,45 +183,49 @@ export const EmployeeDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 overflow-hidden">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-display-lg text-foreground">Field console</h1>
-          <p className="text-body text-muted font-normal mt-1">Welcome, {user?.name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {myAttendanceToday && !myAttendanceToday.clockOut && (
-            <div className="flex items-center gap-2 px-3.5 py-2 bg-forest-50 border border-forest-200 text-forest-700 font-mono text-body-sm font-semibold rounded-xl shadow-xs">
-              <Timer className="w-4 h-4 text-forest-600 animate-pulse" />
-              <span>{timerVal}</span>
-            </div>
-          )}
-          {!myAttendanceToday ? (
-            <button onClick={handleClockIn} className="btn-primary bg-forest-600 hover:bg-forest-700">
-              <Clock className="w-4 h-4" /> Clock in
-            </button>
-          ) : myAttendanceToday.clockOut ? (
-            <span className="badge badge-neutral py-2 px-3">Ended ({myAttendanceToday.clockOut})</span>
-          ) : (
-            <button onClick={handleClockOut} className="btn-danger">
-              <Clock className="w-4 h-4" /> Clock out
-            </button>
-          )}
-          <Link to="/potential-customers" className="btn-primary flex items-center gap-1.5">
-            <PlusCircle className="w-4 h-4" /> Add Potential Customer
-          </Link>
+
+      {/* Header card */}
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="font-display text-display-lg text-foreground">Field console</h1>
+            <p className="text-body text-muted font-normal mt-1">Welcome, {user?.name}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {myAttendanceToday && !myAttendanceToday.clockOut && (
+              <div className="flex items-center gap-2 px-3.5 py-2 bg-forest-50 border border-forest-200 text-forest-700 font-mono text-body-sm font-semibold rounded-xl shadow-xs">
+                <Timer className="w-4 h-4 text-forest-600 animate-pulse" />
+                <span>{timerVal}</span>
+              </div>
+            )}
+            {!myAttendanceToday ? (
+              <button onClick={handleClockIn} className="btn-primary bg-forest-600 hover:bg-forest-700">
+                <Clock className="w-4 h-4" /> Clock in
+              </button>
+            ) : myAttendanceToday.clockOut ? (
+              <span className="badge badge-neutral py-2 px-3">Ended ({myAttendanceToday.clockOut})</span>
+            ) : (
+              <button onClick={handleClockOut} className="btn-danger">
+                <Clock className="w-4 h-4" /> Clock out
+              </button>
+            )}
+            <Link to="/potential-customers" className="btn-primary flex items-center gap-1.5">
+              <PlusCircle className="w-4 h-4" /> Add Potential Customer
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* Location sharing */}
       {isClockedIn && (
-        <div className="card p-5">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="card p-4 sm:p-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <button
                 onClick={handleToggleLocation}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-body-sm font-medium transition-all duration-200 shrink-0 ${
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-body-sm font-medium transition-all duration-200 shrink-0 ${
                   isTracking
                     ? 'bg-forest-600 hover:bg-forest-700 text-white shadow-soft'
                     : 'bg-white hover:bg-warm-50 active:bg-warm-100 text-foreground border border-warm-200 shadow-xs hover:shadow-soft'
@@ -212,14 +246,14 @@ export const EmployeeDashboard: React.FC = () => {
                 )}
               </button>
               {isTracking && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-forest-50 border border-forest-200 text-forest-700 text-body-xs font-semibold rounded-lg animate-pulse">
+                <span className="inline-flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-1 bg-forest-50 border border-forest-200 text-forest-700 text-body-xs font-semibold rounded-lg animate-pulse w-fit">
                   <span className="w-1.5 h-1.5 bg-forest-500 rounded-full"></span>
                   Live
                 </span>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="relative flex-1 min-w-0">
                 <textarea
                   value={locationNote}
                   onChange={e => setLocationNote(e.target.value.slice(0, 200))}
@@ -232,61 +266,65 @@ export const EmployeeDashboard: React.FC = () => {
                   {locationNote.length}/200
                 </span>
               </div>
+              <button
+                onClick={handleSendNote}
+                disabled={!locationNote.trim() || sending}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-body-sm font-medium transition-all duration-200 shrink-0 ${
+                  locationNote.trim() && !sending
+                    ? 'bg-primary-700 hover:bg-primary-800 text-white shadow-soft cursor-pointer'
+                    : 'bg-warm-100 text-warm-400 cursor-not-allowed'
+                }`}
+              >
+                <Send className="w-4 h-4" />
+                {sending ? 'Sending...' : 'Send Note'}
+              </button>
             </div>
-            <button
-              onClick={handleSendNote}
-              disabled={!locationNote.trim() || sending}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-body-sm font-medium transition-all duration-200 shrink-0 ${
-                locationNote.trim() && !sending
-                  ? 'bg-primary-700 hover:bg-primary-800 text-white shadow-soft cursor-pointer'
-                  : 'bg-warm-100 text-warm-400 cursor-not-allowed'
-              }`}
-            >
-              <Send className="w-4 h-4" />
-              {sending ? 'Sending...' : 'Send Note'}
-            </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {stats.map((s, i) => (
-          <div key={i} className="card card-hover p-5 flex items-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
+          <div key={i} className="card card-hover p-4 sm:p-5 flex items-center gap-3 sm:gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
             <div className={`stat-icon ${s.bg} ${s.fg}`}>{s.icon}</div>
-            <div><p className="stat-label truncate">{s.label}</p><p className="stat-value">{s.value}</p></div>
+            <div className="min-w-0"><p className="stat-label truncate">{s.label}</p><p className="stat-value">{s.value}</p></div>
           </div>
         ))}
       </div>
 
+      {/* Collection log */}
       <div className="card overflow-hidden">
-        <div className="px-6 py-4 border-b border-warm-100">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-warm-100">
           <h3 className="section-title">Today's collection log</h3>
         </div>
         {todayCollections.length > 0 ? (
           <div className="divide-y divide-warm-100">
             {todayCollections.map(c => (
-              <div key={c.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-warm-50/50 transition-colors gap-3">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-body font-medium text-foreground">{c.farmerName}</span>
-                    <span className="label bg-warm-100 text-muted px-2 py-0.5 rounded font-mono">{c.farmerId}</span>
+              <div key={c.id} className="flex flex-col p-4 sm:p-5 hover:bg-warm-50/50 transition-colors gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-body font-medium text-foreground truncate">{c.farmerName}</span>
+                      <span className="label bg-warm-100 text-muted px-2 py-0.5 rounded font-mono text-xs shrink-0">{c.farmerId}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-body-sm text-muted">
+                      <span>Shift: <strong>{c.timeOfDay}</strong></span>
+                      <span>Qty: <strong>{c.quantityLitres} L</strong></span>
+                      <span>Fat/SNF: <strong>{c.fatPercent}% / {c.snfPercent}%</strong></span>
+                      <span>Rate: <strong>₹{c.ratePerLitre}/L</strong></span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-body-sm text-muted">
-                    <span>Shift: <strong>{c.timeOfDay}</strong></span>
-                    <span>Qty: <strong>{c.quantityLitres} L</strong></span>
-                    <span>Fat/SNF: <strong>{c.fatPercent}% / {c.snfPercent}%</strong></span>
-                    <span>Rate: <strong>₹{c.ratePerLitre}/L</strong></span>
+                  <div className="text-left sm:text-right shrink-0">
+                    <span className="label block text-muted">Amount</span>
+                    <span className="text-body font-bold text-forest-700 font-mono">₹{c.totalAmount.toFixed(2)}</span>
                   </div>
-                </div>
-                <div className="text-right sm:text-right">
-                  <span className="label block text-muted">Amount</span>
-                  <span className="text-body font-bold text-forest-700 font-mono">₹{c.totalAmount.toFixed(2)}</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="empty-state py-12">
+          <div className="empty-state py-10 sm:py-12">
             <ClipboardList className="w-10 h-10 text-warm-300 mb-3" />
             <p className="text-muted text-body font-medium">No milk collections logged today.</p>
           </div>
