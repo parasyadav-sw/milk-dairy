@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { useDatabase } from '../context/DatabaseContext';
 import { useAuth } from '../context/AuthContext';
 import { useGPSTracking } from '../hooks/useGPSTracking';
-import { Clock, Milk, ClipboardList, Timer, PlusCircle, Radio, MapPin } from 'lucide-react';
+import { Clock, Milk, ClipboardList, Timer, PlusCircle, Radio, MapPin, Send } from 'lucide-react';
 import { Toast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const EmployeeDashboard: React.FC = () => {
-  const { collections, attendance, surveys, clockIn, clockOut } = useDatabase();
+  const { collections, attendance, surveys, clockIn, clockOut, sendNote } = useDatabase();
   const { user } = useAuth();
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
@@ -21,6 +21,7 @@ export const EmployeeDashboard: React.FC = () => {
   // Location sharing
   const [shareLocation, setShareLocation] = useState(false);
   const [locationNote, setLocationNote] = useState('');
+  const [sending, setSending] = useState(false);
 
   const { isTracking, permissionState, error: gpsError } = useGPSTracking({
     enabled: shareLocation && isClockedIn && !!user?.id,
@@ -116,6 +117,35 @@ export const EmployeeDashboard: React.FC = () => {
     }
   };
 
+  const handleSendNote = async () => {
+    if (!locationNote.trim() || !user) return;
+    setSending(true);
+    try {
+      let lat: number | undefined;
+      let lng: number | undefined;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false,
+            timeout: 5000,
+            maximumAge: 30000,
+          });
+        });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch {
+        // GPS unavailable — send note without location
+      }
+      await sendNote(locationNote.trim(), lat, lng);
+      setLocationNote('');
+      triggerToast('Note sent!');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to send note', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const stats = [
     { label: "Today's Milk", value: `${totalLitresCollected.toFixed(1)} L`, icon: <Milk className="w-5 h-5" />, bg: 'bg-primary-50', fg: 'text-primary-700' },
     { label: 'Collections Logged', value: `${todayCollections.length} done`, icon: <ClipboardList className="w-5 h-5" />, bg: 'bg-forest-50', fg: 'text-forest-700' },
@@ -203,6 +233,18 @@ export const EmployeeDashboard: React.FC = () => {
                 </span>
               </div>
             </div>
+            <button
+              onClick={handleSendNote}
+              disabled={!locationNote.trim() || sending}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-body-sm font-medium transition-all duration-200 shrink-0 ${
+                locationNote.trim() && !sending
+                  ? 'bg-primary-700 hover:bg-primary-800 text-white shadow-soft cursor-pointer'
+                  : 'bg-warm-100 text-warm-400 cursor-not-allowed'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              {sending ? 'Sending...' : 'Send Note'}
+            </button>
           </div>
         </div>
       )}

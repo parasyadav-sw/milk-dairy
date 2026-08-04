@@ -6,7 +6,7 @@ import { TrackingDashboard } from '../components/tracking/TrackingDashboard';
 import { EmployeeDetailPanel } from '../components/tracking/EmployeeDetailPanel';
 import { RoutePlayback } from '../components/tracking/RoutePlayback';
 import { GeofenceManager } from '../components/tracking/GeofenceManager';
-import { MapPin, Route, Shield, Radio, Filter, RotateCcw, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { MapPin, Route, Shield, Radio, Filter, RotateCcw, ChevronDown, ChevronUp, Eye, MessageSquare } from 'lucide-react';
 
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -79,7 +79,7 @@ function getInitials(name: string) {
 }
 
 export const LiveTracking: React.FC = () => {
-  const { users, locations, attendance, surveys, geofences } = useDatabase();
+  const { users, locations, attendance, surveys, geofences, notes, refreshLocations } = useDatabase();
   const { user } = useAuth();
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [filterEmployee, setFilterEmployee] = useState('');
@@ -88,6 +88,15 @@ export const LiveTracking: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Auto-refresh polling: fetch latest locations every 10 seconds when enabled
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      refreshLocations();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshLocations]);
 
   const employees = useMemo(() => users.filter(u => u.role === 'EMPLOYEE'), [users]);
 
@@ -119,6 +128,12 @@ export const LiveTracking: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     return surveys.filter(s => s.surveyDate === today);
   }, [surveys]);
+
+  const recentNotes = useMemo(() => {
+    return [...notes]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 10);
+  }, [notes]);
 
   const handleMarkerClick = useCallback((empId: string) => {
     const loc = latestByUser.get(empId);
@@ -353,6 +368,38 @@ export const LiveTracking: React.FC = () => {
                     <MapPin className="w-8 h-8 mx-auto mb-2 text-warm-300" />
                     <p>No employee location data available</p>
                     <p className="text-caption mt-1">Employees will appear here after clocking in</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-body font-semibold text-foreground flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-primary-600" />
+                Recent Notes
+              </h3>
+              <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
+                {recentNotes.length > 0 ? (
+                  recentNotes.map(note => (
+                    <div key={note.id} className="bg-white border border-warm-200 rounded-xl p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-body-sm font-medium text-foreground">{note.userName || 'Employee'}</span>
+                        <span className="text-caption text-muted">
+                          {new Date(note.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-body-sm text-foreground">{note.noteText}</p>
+                      {note.latitude != null && note.longitude != null && (
+                        <p className="text-caption text-muted">
+                          {note.latitude.toFixed(4)}, {note.longitude.toFixed(4)}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-muted text-body-sm">
+                    <MessageSquare className="w-6 h-6 mx-auto mb-2 text-warm-300" />
+                    <p>No notes shared yet</p>
                   </div>
                 )}
               </div>

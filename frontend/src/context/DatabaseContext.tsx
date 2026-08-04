@@ -189,6 +189,16 @@ export interface GeofenceAlert {
   timestamp: string;
 }
 
+export interface EmployeeNote {
+  id: number;
+  userId: string;
+  userName?: string;
+  noteText: string;
+  latitude: number | null;
+  longitude: number | null;
+  timestamp: string;
+}
+
 interface DatabaseContextType {
   isApiMode: boolean;
   setApiMode: (val: boolean) => void;
@@ -204,6 +214,7 @@ interface DatabaseContextType {
   locations: EmployeeLocation[];
   geofences: Geofence[];
   geofenceAlerts: GeofenceAlert[];
+  notes: EmployeeNote[];
   refreshData: () => Promise<void>;
   
   // Mutating Operations
@@ -234,6 +245,8 @@ interface DatabaseContextType {
   deleteGeofence: (id: number) => Promise<void>;
   refreshLocations: () => Promise<void>;
   refreshGeofenceAlerts: () => Promise<void>;
+  sendNote: (noteText: string, latitude?: number, longitude?: number) => Promise<EmployeeNote>;
+  fetchNotes: () => Promise<void>;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -381,10 +394,11 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [locations, setLocations] = useState<EmployeeLocation[]>([]);
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [geofenceAlerts, setGeofenceAlerts] = useState<GeofenceAlert[]>([]);
+  const [notes, setNotes] = useState<EmployeeNote[]>([]);
 
   const refreshData = async () => {
     try {
-      const [uRes, fRes, cRes, pRes, aRes, lRes, logRes, sRes, pcRes, locRes, gfRes, gaRes] = await Promise.all([
+      const [uRes, fRes, cRes, pRes, aRes, lRes, logRes, sRes, pcRes, locRes, gfRes, gaRes, nRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('farmers').select('*, profiles(name)'),
         supabase.from('milk_collections').select('*, profiles(name), farmers(name, village)'),
@@ -397,6 +411,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         supabase.from('employee_locations').select('*, profiles(name)').order('timestamp', { ascending: false }).limit(500),
         supabase.from('geofences').select('*'),
         supabase.from('geofence_alerts').select('*, profiles(name)').order('timestamp', { ascending: false }).limit(200),
+        supabase.from('employee_notes').select('*, profiles(name)').order('timestamp', { ascending: false }).limit(200),
       ]);
 
       if (uRes.error) throw uRes.error;
@@ -477,6 +492,15 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         longitude: a.longitude,
         timestamp: a.timestamp,
       })));
+      setNotes((nRes.data || []).map((n: any) => ({
+        id: Number(n.id),
+        userId: n.user_id,
+        userName: n.profiles?.name,
+        noteText: n.note_text,
+        latitude: n.latitude,
+        longitude: n.longitude,
+        timestamp: n.timestamp,
+      })));
     } catch (err) {
       console.error('Error refreshing data from Supabase:', err);
     }
@@ -485,6 +509,82 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Load data on mount
   useEffect(() => {
     refreshData();
+  }, []);
+
+  // Supabase Realtime: subscribe to employee_locations inserts for live admin updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('employee_locations_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'employee_locations' },
+        async (payload: any) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+          // Fetch the profile name for the new row
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', newRow.user_id)
+            .maybeSingle();
+          const mapped: EmployeeLocation = {
+            id: Number(newRow.id),
+            userId: newRow.user_id,
+            userName: profile?.name,
+            latitude: newRow.latitude,
+            longitude: newRow.longitude,
+            accuracy: newRow.accuracy,
+            speed: newRow.speed,
+            batteryLevel: newRow.battery_level,
+            timestamp: newRow.timestamp,
+            note: newRow.note || undefined,
+          };
+          setLocations(prev => {
+            // Keep only the latest location per user, prepend new one
+            const filtered = prev.filter(l => l.userId !== mapped.userId);
+            return [mapped, ...filtered].slice(0, 500);
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Supabase Realtime: subscribe to employee_notes inserts for live admin updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('employee_notes_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'employee_notes' },
+        async (payload: any) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', newRow.user_id)
+            .maybeSingle();
+          const mapped: EmployeeNote = {
+            id: Number(newRow.id),
+            userId: newRow.user_id,
+            userName: profile?.name,
+            noteText: newRow.note_text,
+            latitude: newRow.latitude,
+            longitude: newRow.longitude,
+            timestamp: newRow.timestamp,
+          };
+          setNotes(prev => [mapped, ...prev].slice(0, 200));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const logAudit = async (userId: string | undefined, action: string, details: string) => {
@@ -1310,6 +1410,56 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const sendNote = async (noteText: string, latitude?: number, longitude?: number): Promise<EmployeeNote> => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (!currentUser) throw new Error('Unauthenticated');
+
+    const { data, error } = await supabase
+      .from('employee_notes')
+      .insert({
+        user_id: currentUser.id,
+        note_text: noteText,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const mapped: EmployeeNote = {
+      id: Number(data.id),
+      userId: data.user_id,
+      userName: currentUser.user_metadata?.name,
+      noteText: data.note_text,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      timestamp: data.timestamp,
+    };
+
+    setNotes(prev => [mapped, ...prev].slice(0, 200));
+    return mapped;
+  };
+
+  const fetchNotes = async () => {
+    const { data, error } = await supabase
+      .from('employee_notes')
+      .select('*, profiles(name)')
+      .order('timestamp', { ascending: false })
+      .limit(200);
+    if (!error && data) {
+      setNotes(data.map((n: any) => ({
+        id: Number(n.id),
+        userId: n.user_id,
+        userName: n.profiles?.name,
+        noteText: n.note_text,
+        latitude: n.latitude,
+        longitude: n.longitude,
+        timestamp: n.timestamp,
+      })));
+    }
+  };
+
   return (
     <DatabaseContext.Provider value={{
       isApiMode,
@@ -1326,6 +1476,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       locations,
       geofences,
       geofenceAlerts,
+      notes,
       refreshData,
       addUser,
       updateUser,
@@ -1350,6 +1501,8 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deleteGeofence,
       refreshLocations,
       refreshGeofenceAlerts,
+      sendNote,
+      fetchNotes,
     }}>
       {children}
     </DatabaseContext.Provider>

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { EmployeeLocation } from '../../context/DatabaseContext';
+import { useDatabase } from '../../context/DatabaseContext';
 import { haversineDistance } from '../../hooks/useGPSTracking';
-import { User, MapPin, Clock, Battery, Navigation, Signal, X, ChevronRight } from 'lucide-react';
+import { User, MapPin, Clock, Battery, Navigation, Signal, X, ChevronRight, MessageSquare } from 'lucide-react';
 
 interface EmployeeDetailPanelProps {
   location: EmployeeLocation | null;
@@ -30,6 +31,15 @@ function getMarkerColor(timestamp: string): string {
 export const EmployeeDetailPanel: React.FC<EmployeeDetailPanelProps> = ({ location, attendance, onClose }) => {
   const [address, setAddress] = useState<string>('Loading address...');
   const [todayDistance, setTodayDistance] = useState<number>(0);
+  const { fetchLocationHistory, notes } = useDatabase();
+
+  const employeeNotes = useMemo(() => {
+    if (!location) return [];
+    return notes
+      .filter(n => n.userId === location.userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 20);
+  }, [notes, location]);
 
   useEffect(() => {
     if (!location) return;
@@ -47,7 +57,27 @@ export const EmployeeDetailPanel: React.FC<EmployeeDetailPanelProps> = ({ locati
       })
       .catch(() => setAddress('Failed to load address'));
 
-    setTodayDistance(0);
+    // Calculate today's total distance from location history
+    const today = new Date().toISOString().split('T')[0];
+    fetchLocationHistory(location.userId, today).then((history) => {
+      if (history.length < 2) {
+        setTodayDistance(0);
+        return;
+      }
+      const sorted = [...history].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      let total = 0;
+      for (let i = 1; i < sorted.length; i++) {
+        total += haversineDistance(
+          sorted[i - 1].latitude,
+          sorted[i - 1].longitude,
+          sorted[i].latitude,
+          sorted[i].longitude
+        );
+      }
+      setTodayDistance(total);
+    }).catch(() => setTodayDistance(0));
   }, [location]);
 
   if (!location) return null;
@@ -159,6 +189,30 @@ export const EmployeeDetailPanel: React.FC<EmployeeDetailPanelProps> = ({ locati
           <div className="bg-warm-50 rounded-xl p-3 text-center">
             <span className="text-display-sm font-bold text-primary-700">{todayDistance.toFixed(2)} km</span>
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-label text-warm-500 uppercase tracking-wider">Notes</h4>
+          {employeeNotes.length > 0 ? (
+            <div className="space-y-2">
+              {employeeNotes.map(note => (
+                <div key={note.id} className="bg-warm-50 rounded-xl p-3 space-y-1">
+                  <div className="flex items-start gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-primary-600 mt-0.5 shrink-0" />
+                    <p className="text-body-sm text-foreground flex-1">{note.noteText}</p>
+                  </div>
+                  <div className="flex items-center justify-between text-caption text-muted pl-5.5">
+                    <span>{new Date(note.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {note.latitude != null && note.longitude != null && (
+                      <span>{note.latitude.toFixed(4)}, {note.longitude.toFixed(4)}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-body-sm text-muted bg-warm-50 rounded-xl p-3">No notes shared today</p>
+          )}
         </div>
       </div>
     </div>
