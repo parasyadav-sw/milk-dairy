@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import prisma from '../db';
+import prisma, { TransactionClient } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 export const registerFarmer = async (req: AuthRequest, res: Response) => {
@@ -32,50 +32,76 @@ export const registerFarmer = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Missing required farmer registration details' });
     }
 
-    // Auto-generate farmer ID (e.g., FMR-0001)
-    const farmerCount = await prisma.farmer.count();
-    const farmerId = `FMR-${String(farmerCount + 1).padStart(4, '0')}`;
+    if (typeof mobile !== 'string' || !/^[0-9]{10}$/.test(mobile)) {
+      return res.status(400).json({ error: 'Invalid mobile number format' });
+    }
+
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+      return res.status(400).json({ error: 'Invalid age' });
+    }
 
     const cows = cowCount ? parseInt(cowCount) : 0;
     const buffalos = buffaloCount ? parseInt(buffaloCount) : 0;
+
+    if (isNaN(cows) || isNaN(buffalos) || cows < 0 || buffalos < 0) {
+      return res.status(400).json({ error: 'Invalid animal count' });
+    }
+
     const totalAnimals = cows + buffalos;
 
-    const newFarmer = await prisma.farmer.create({
-      data: {
-        id: farmerId,
-        name,
-        mobile,
-        altMobile,
-        gender,
-        age: parseInt(age),
-        aadhaar,
-        village,
-        taluka,
-        district,
-        address,
-        gpsLocation,
-        animalType,
-        cowCount: cows,
-        buffaloCount: buffalos,
-        totalAnimals,
-        cowMilkYield: cowMilkYield ? parseFloat(cowMilkYield) : 0.0,
-        buffaloMilkYield: buffaloMilkYield ? parseFloat(buffaloMilkYield) : 0.0,
-        registeredById: employeeId
-      }
+    const cowYield = cowMilkYield ? parseFloat(cowMilkYield) : 0;
+    const buffaloYield = buffaloMilkYield ? parseFloat(buffaloMilkYield) : 0;
+
+    if (isNaN(cowYield) || isNaN(buffaloYield) || cowYield < 0 || buffaloYield < 0) {
+      return res.status(400).json({ error: 'Invalid milk yield value' });
+    }
+
+    // Generate farmer ID atomically using transaction
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
+      const lastFarmer = await tx.farmer.findFirst({ orderBy: { id: 'desc' } });
+      const nextNum = lastFarmer ? parseInt(lastFarmer.id.split('-')[1]) + 1 : 1;
+      const farmerId = `FMR-${String(nextNum).padStart(4, '0')}`;
+
+      const newFarmer = await tx.farmer.create({
+        data: {
+          id: farmerId,
+          name,
+          mobile,
+          altMobile,
+          gender,
+          age: ageNum,
+          aadhaar,
+          village,
+          taluka,
+          district,
+          address,
+          gpsLocation,
+          animalType,
+          cowCount: cows,
+          buffaloCount: buffalos,
+          totalAnimals,
+          cowMilkYield: cowYield,
+          buffaloMilkYield: buffaloYield,
+          registeredById: employeeId
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: employeeId,
+          action: 'REGISTER_FARMER',
+          details: `Registered farmer ${name} with ID ${farmerId}`
+        }
+      });
+
+      return newFarmer;
     });
 
-    // Log action
-    await prisma.auditLog.create({
-      data: {
-        userId: employeeId,
-        action: 'REGISTER_FARMER',
-        details: `Registered farmer ${name} with ID ${farmerId}`
-      }
-    });
-
-    res.status(201).json(newFarmer);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('[FARMER] Register error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -85,20 +111,18 @@ export const getFarmers = async (req: AuthRequest, res: Response) => {
   try {
     const filters: any = {};
 
-    if (village) {
-      filters.village = String(village);
+    if (village && typeof village === 'string') {
+      filters.village = village;
     }
 
-    if (search) {
+    if (search && typeof search === 'string') {
       filters.OR = [
-        { name: { contains: String(search), mode: 'insensitive' } },
-        { id: { contains: String(search), mode: 'insensitive' } },
-        { mobile: { contains: String(search) } }
+        { name: { contains: search, mode: 'insensitive' } },
+        { id: { contains: search, mode: 'insensitive' } },
+        { mobile: { contains: search } }
       ];
     }
 
-    // If Employee, we could restrict them to only see their registered/route farmers,
-    // but the prompt says they can "View all Farmers" or registers. Let's make it open.
     const farmers = await prisma.farmer.findMany({
       where: filters,
       include: {
@@ -108,8 +132,9 @@ export const getFarmers = async (req: AuthRequest, res: Response) => {
     });
 
     res.json(farmers);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[FARMER] Get all error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -117,6 +142,10 @@ export const getFarmerById = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   try {
+    if (typeof id !== 'string' || id.length === 0) {
+      return res.status(400).json({ error: 'Invalid farmer ID' });
+    }
+
     const farmer = await prisma.farmer.findUnique({
       where: { id },
       include: {
@@ -131,8 +160,9 @@ export const getFarmerById = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(farmer);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[FARMER] Get by ID error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -204,8 +234,9 @@ export const updateFarmer = async (req: AuthRequest, res: Response) => {
     });
 
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[FARMER] Update error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -223,22 +254,23 @@ export const deleteFarmer = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    // Delete related milk collections and payments first if they exist to prevent foreign key errors
-    await prisma.milkCollection.deleteMany({ where: { farmerId: id } });
-    await prisma.payment.deleteMany({ where: { farmerId: id } });
-
-    await prisma.farmer.delete({ where: { id } });
-
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'DELETE_FARMER',
-        details: `Deleted customer ${farmer.name} (ID: ${id})`
-      }
+    // Delete in a transaction to ensure atomicity
+    await prisma.$transaction(async (tx: TransactionClient) => {
+      await tx.milkCollection.deleteMany({ where: { farmerId: id } });
+      await tx.payment.deleteMany({ where: { farmerId: id } });
+      await tx.farmer.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'DELETE_FARMER',
+          details: `Deleted customer ${farmer.name} (ID: ${id})`
+        }
+      });
     });
 
     res.json({ message: 'Customer deleted successfully' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[FARMER] Delete error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -13,7 +13,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout, login } = useAuth();
+  const { user, logout } = useAuth();
   const { isApiMode, setApiMode, updateLocationSharing, fetchActiveTrip, closeTrip } = useDatabase();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,7 +40,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       } catch {}
     }
     localStorage.removeItem(`locationSharing_${user?.id}`);
-    logout();
+    await logout();
   };
   
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -56,25 +56,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [mobileOpen, profileOpen]);
-
-  const handleRoleSimulation = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const roleName = e.target.value;
-    if (roleName) {
-      logout();
-      setTimeout(async () => {
-        try {
-          const defaultPasswords: { [key: string]: string } = {
-            'Ramesh': 'admin123',
-            'Amit': 'employee123'
-          };
-          await login(roleName, defaultPasswords[roleName] || 'password');
-          navigate('/');
-        } catch (err) {
-          console.error('Role simulator failed:', err);
-        }
-      }, 100);
-    }
-  };
 
   const getNavLinks = () => {
     const links = [
@@ -105,7 +86,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span className="text-caption text-muted tracking-wide">Enterprise</span>
         </div>
         {isMobile && (
-          <button onClick={() => setMobileOpen(false)} className="ml-auto p-1.5 rounded-lg hover:bg-warm-100 transition-colors">
+          <button onClick={() => setMobileOpen(false)} className="ml-auto p-1.5 rounded-lg hover:bg-warm-100 transition-colors" aria-label="Close menu">
             <X className="w-5 h-5 text-muted" />
           </button>
         )}
@@ -145,6 +126,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-body-sm font-medium text-error hover:bg-red-50 transition-all duration-200"
+          aria-label="Sign out"
         >
           <LogOut className="w-[18px] h-[18px]" />
           Sign out
@@ -174,6 +156,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button 
               onClick={() => setMobileOpen(true)}
               className="p-2 md:hidden hover:bg-warm-100 rounded-xl transition-colors"
+              aria-label="Open menu"
             >
               <Menu className="w-5 h-5 text-warm-600" />
             </button>
@@ -193,6 +176,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-warm-50 transition-all duration-200 border border-transparent hover:border-warm-200"
+                  aria-label="Profile menu"
+                  aria-expanded={profileOpen}
                 >
                   <div className="w-8 h-8 rounded-xl bg-primary-700 text-white flex items-center justify-center font-medium text-sm shadow-sm">
                     {user.name.charAt(0)}

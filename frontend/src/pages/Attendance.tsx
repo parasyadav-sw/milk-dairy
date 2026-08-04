@@ -6,11 +6,10 @@ import { Calendar, ShieldAlert, Clock, User, Filter, RotateCcw, Award, CheckCirc
 import { Toast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
-const today = new Date().toISOString().split('T')[0];
-
 export const Attendance: React.FC = () => {
   const { attendance, users, clockIn, clockOut } = useDatabase();
   const { user } = useAuth();
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   const isClockedIn = useMemo(() => {
     if (!user) return false;

@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import prisma from '../db';
+import prisma, { TransactionClient } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 export const createSurvey = async (req: AuthRequest, res: Response) => {
@@ -15,30 +15,20 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Missing required survey details' });
     }
 
-    // Create the survey record in the database, serializing animals as string
-    const newSurvey = await prisma.survey.create({
-      data: {
-        customerName,
-        mobile,
-        village,
-        address,
-        animals: JSON.stringify(animals),
-        totalAnimals: parseInt(totalAnimals),
-        totalMilkProduction: parseFloat(totalMilkProduction),
-        interested: !!interested,
-        remarks,
-        employeeId,
-        surveyDate: surveyDate || new Date().toISOString().split('T')[0]
-      },
-      include: {
-        employee: { select: { name: true } }
-      }
-    });
+    if (typeof mobile !== 'string' || !/^[0-9]{10}$/.test(mobile)) {
+      return res.status(400).json({ error: 'Invalid mobile number format' });
+    }
 
-    // Check if farmer (customer) exists by mobile number
-    const existingFarmer = await prisma.farmer.findFirst({
-      where: { mobile }
-    });
+    const totalAnimalsNum = parseInt(totalAnimals);
+    const totalMilkNum = parseFloat(totalMilkProduction);
+
+    if (isNaN(totalAnimalsNum) || totalAnimalsNum < 0) {
+      return res.status(400).json({ error: 'Invalid total animals' });
+    }
+
+    if (isNaN(totalMilkNum) || totalMilkNum < 0) {
+      return res.status(400).json({ error: 'Invalid total milk production' });
+    }
 
     // Parse counts and milk yields from animals array
     let cowCount = 0;
@@ -76,70 +66,98 @@ export const createSurvey = async (req: AuthRequest, res: Response) => {
 
     const dateStr = surveyDate || new Date().toISOString().split('T')[0];
 
-    if (existingFarmer) {
-      // Update existing farmer details
-      await prisma.farmer.update({
-        where: { id: existingFarmer.id },
+    // Use a transaction for atomicity
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
+      const newSurvey = await tx.survey.create({
         data: {
-          name: customerName,
-          village,
-          address,
-          animalType,
-          cowCount,
-          buffaloCount,
-          totalAnimals: cowCount + buffaloCount,
-          cowMilkYield: finalCowMilkYield,
-          buffaloMilkYield: finalBuffaloMilkYield,
-          surveyDate: dateStr,
-          notes: remarks
-        }
-      });
-    } else {
-      // Register a new farmer
-      const farmerCount = await prisma.farmer.count();
-      const farmerId = `FMR-${String(farmerCount + 1).padStart(4, '0')}`;
-
-      await prisma.farmer.create({
-        data: {
-          id: farmerId,
-          name: customerName,
+          customerName,
           mobile,
-          gender: 'MALE',
-          age: 30,
           village,
-          taluka: 'Jaipur',
-          district: 'Jaipur',
           address,
-          animalType,
-          cowCount,
-          buffaloCount,
-          totalAnimals: cowCount + buffaloCount,
-          cowMilkYield: finalCowMilkYield,
-          buffaloMilkYield: finalBuffaloMilkYield,
-          registeredById: employeeId,
-          surveyDate: dateStr,
-          notes: remarks
+          animals: JSON.stringify(animals),
+          totalAnimals: totalAnimalsNum,
+          totalMilkProduction: totalMilkNum,
+          interested: !!interested,
+          remarks,
+          employeeId,
+          surveyDate: dateStr
+        },
+        include: {
+          employee: { select: { name: true } }
         }
       });
-    }
 
-    // Create Audit Log
-    await prisma.auditLog.create({
-      data: {
-        userId: employeeId,
-        action: 'SUBMIT_SURVEY',
-        details: `Submitted survey for customer ${customerName} (Animals: ${totalAnimals}, Milk: ${totalMilkProduction}L)`
+      // Check if farmer exists by mobile number
+      const existingFarmer = await tx.farmer.findFirst({
+        where: { mobile }
+      });
+
+      if (existingFarmer) {
+        await tx.farmer.update({
+          where: { id: existingFarmer.id },
+          data: {
+            name: customerName,
+            village,
+            address,
+            animalType,
+            cowCount,
+            buffaloCount,
+            totalAnimals: cowCount + buffaloCount,
+            cowMilkYield: finalCowMilkYield,
+            buffaloMilkYield: finalBuffaloMilkYield,
+            surveyDate: dateStr,
+            notes: remarks
+          }
+        });
+      } else {
+        const lastFarmer = await tx.farmer.findFirst({ orderBy: { id: 'desc' } });
+        const nextNum = lastFarmer ? parseInt(lastFarmer.id.split('-')[1]) + 1 : 1;
+        const farmerId = `FMR-${String(nextNum).padStart(4, '0')}`;
+
+        await tx.farmer.create({
+          data: {
+            id: farmerId,
+            name: customerName,
+            mobile,
+            gender: 'MALE',
+            age: 30,
+            village,
+            taluka: 'Jaipur',
+            district: 'Jaipur',
+            address,
+            animalType,
+            cowCount,
+            buffaloCount,
+            totalAnimals: cowCount + buffaloCount,
+            cowMilkYield: finalCowMilkYield,
+            buffaloMilkYield: finalBuffaloMilkYield,
+            registeredById: employeeId,
+            surveyDate: dateStr,
+            notes: remarks
+          }
+        });
       }
+
+      await tx.auditLog.create({
+        data: {
+          userId: employeeId,
+          action: 'SUBMIT_SURVEY',
+          details: `Submitted survey for customer ${customerName} (Animals: ${totalAnimalsNum}, Milk: ${totalMilkNum}L)`
+        }
+      });
+
+      return newSurvey;
     });
 
     const parsedSurvey = {
-      ...newSurvey,
-      animals: JSON.parse(newSurvey.animals)
+      ...result,
+      animals: JSON.parse(result.animals)
     };
 
     res.status(201).json(parsedSurvey);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[SURVEY] Create error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -176,7 +194,8 @@ export const getSurveys = async (req: AuthRequest, res: Response) => {
     }));
 
     res.json(parsedSurveys);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[SURVEY] Get all error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

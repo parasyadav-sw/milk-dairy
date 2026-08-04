@@ -4,7 +4,6 @@ import { AuthRequest } from '../middleware/auth';
 
 export const getPendingPayments = async (req: AuthRequest, res: Response) => {
   try {
-    // Find all milk collections where paymentStatus is PENDING, group them by farmer
     const pendingCollections = await prisma.milkCollection.findMany({
       where: { paymentStatus: 'PENDING' },
       include: {
@@ -19,7 +18,6 @@ export const getPendingPayments = async (req: AuthRequest, res: Response) => {
       }
     });
 
-    // Group and aggregate in memory to support customized format
     const aggregated: { [key: string]: any } = {};
 
     pendingCollections.forEach((col: any) => {
@@ -46,8 +44,9 @@ export const getPendingPayments = async (req: AuthRequest, res: Response) => {
     }));
 
     res.json(results);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[PAYMENT] Get pending error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -60,7 +59,7 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!farmerId) {
+    if (!farmerId || typeof farmerId !== 'string') {
       return res.status(400).json({ error: 'Farmer ID is required' });
     }
 
@@ -80,7 +79,6 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
     const roundedAmount = Math.round(totalAmount * 100) / 100;
     const dateToday = new Date().toISOString().split('T')[0];
 
-    // Use Prisma transaction to create Payment and update MilkCollections
     const result = await prisma.$transaction(async (tx: any) => {
       const payment = await tx.payment.create({
         data: {
@@ -106,7 +104,6 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
       return payment;
     });
 
-    // Log action
     await prisma.auditLog.create({
       data: {
         userId: adminId,
@@ -116,8 +113,9 @@ export const processPayment = async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[PAYMENT] Process error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -132,7 +130,8 @@ export const getPaymentHistory = async (req: AuthRequest, res: Response) => {
     });
 
     res.json(payments);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[PAYMENT] Get history error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -17,19 +17,25 @@ export const createRoute = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Route name and village are required' });
     }
 
+    const empId = assignedEmployeeId ? parseInt(assignedEmployeeId) : null;
+    if (assignedEmployeeId && (isNaN(empId!) || empId! <= 0)) {
+      return res.status(400).json({ error: 'Invalid employee ID' });
+    }
+
     const route = await prisma.route.create({
       data: {
         name,
         description,
         village,
         adminId,
-        assignedEmployeeId: assignedEmployeeId ? parseInt(assignedEmployeeId) : null
+        assignedEmployeeId: empId
       }
     });
 
     res.status(201).json(route);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ROUTE] Create error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -52,7 +58,6 @@ export const getRoutes = async (req: AuthRequest, res: Response) => {
         }
       });
     } else {
-      // Employee sees their assigned routes
       routes = await prisma.route.findMany({
         where: { assignedEmployeeId: userId },
         include: {
@@ -62,8 +67,9 @@ export const getRoutes = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(routes);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ROUTE] Get error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -76,6 +82,10 @@ export const updateRoute = async (req: AuthRequest, res: Response) => {
     const role = req.user?.role;
     const userId = req.user?.id;
 
+    if (isNaN(routeId)) {
+      return res.status(400).json({ error: 'Invalid route ID' });
+    }
+
     const existingRoute = await prisma.route.findUnique({ where: { id: routeId } });
     if (!existingRoute) {
       return res.status(404).json({ error: 'Route not found' });
@@ -85,19 +95,22 @@ export const updateRoute = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'Forbidden: You do not own this route' });
     }
 
+    const empId = assignedEmployeeId !== undefined ? (assignedEmployeeId ? parseInt(assignedEmployeeId) : null) : existingRoute.assignedEmployeeId;
+
     const updated = await prisma.route.update({
       where: { id: routeId },
       data: {
         name: name !== undefined ? name : existingRoute.name,
         description: description !== undefined ? description : existingRoute.description,
         village: village !== undefined ? village : existingRoute.village,
-        assignedEmployeeId: assignedEmployeeId !== undefined ? (assignedEmployeeId ? parseInt(assignedEmployeeId) : null) : existingRoute.assignedEmployeeId
+        assignedEmployeeId: empId
       }
     });
 
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ROUTE] Update error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -108,6 +121,10 @@ export const deleteRoute = async (req: AuthRequest, res: Response) => {
     const routeId = parseInt(id);
     const role = req.user?.role;
     const userId = req.user?.id;
+
+    if (isNaN(routeId)) {
+      return res.status(400).json({ error: 'Invalid route ID' });
+    }
 
     const existingRoute = await prisma.route.findUnique({ where: { id: routeId } });
     if (!existingRoute) {
@@ -120,7 +137,8 @@ export const deleteRoute = async (req: AuthRequest, res: Response) => {
 
     await prisma.route.delete({ where: { id: routeId } });
     res.json({ message: 'Route deleted successfully' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ROUTE] Delete error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -20,6 +20,7 @@ export const exportToCSV = (filename: string, headers: string[], rows: any[][]) 
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 export const exportToExcel = (filename: string, headers: string[], rows: any[][]) => {

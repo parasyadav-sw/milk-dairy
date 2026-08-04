@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useDatabase } from '../context/DatabaseContext';
+import { supabase } from '../supabase';
 import { KeyRound, ShieldAlert, Award, Calendar, Mail, UserCheck } from 'lucide-react';
 import { Toast } from '../components/Toast';
 
 export const Profile: React.FC = () => {
   const { user } = useAuth();
-  const { updateUser } = useDatabase();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,12 +33,11 @@ export const Profile: React.FC = () => {
 
     setLoading(true);
     try {
-      if (user) {
-        await updateUser(user.id, { password });
-        triggerToast('Password updated successfully!');
-        setPassword('');
-        setConfirmPassword('');
-      }
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      triggerToast('Password updated successfully!');
+      setPassword('');
+      setConfirmPassword('');
     } catch (err: any) {
       triggerToast(err.message || 'Failed to update password', 'error');
     } finally {
@@ -92,6 +90,7 @@ export const Profile: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)} 
               placeholder="Minimum 6 characters" 
               className="input" 
+              minLength={6}
             />
           </div>
           <div className="space-y-1.5">
@@ -103,6 +102,7 @@ export const Profile: React.FC = () => {
               onChange={(e) => setConfirmPassword(e.target.value)} 
               placeholder="Repeat new password" 
               className="input" 
+              minLength={6}
             />
           </div>
           <button 

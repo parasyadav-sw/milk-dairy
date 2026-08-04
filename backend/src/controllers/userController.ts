@@ -4,7 +4,7 @@ import prisma from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 export const createUser = async (req: AuthRequest, res: Response) => {
-  const { email, username, password, name, role, managerId } = req.body;
+  const { email, username, password, name, role } = req.body;
 
   try {
     const creatorRole = req.user?.role;
@@ -23,50 +23,63 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Email, username, password, name, and role are required' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+    if (typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
-    if (existingUsername) {
-      return res.status(400).json({ error: 'User with this username already exists' });
+    if (typeof username !== 'string' || username.length < 3 || username.length > 30) {
+      return res.status(400).json({ error: 'Username must be 3-30 characters' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
 
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-        name,
-        role,
-        status: 'ACTIVE'
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        status: true,
-        createdAt: true
+    if (!['ADMIN', 'EMPLOYEE'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be ADMIN or EMPLOYEE' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    try {
+      const newUser = await prisma.user.create({
+        data: {
+          email,
+          username,
+          password: hashedPassword,
+          name,
+          role,
+          status: 'ACTIVE'
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          role: true,
+          status: true,
+          createdAt: true
+        }
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: creatorId,
+          action: 'CREATE_USER',
+          details: `Created user ${name} (${role})`
+        }
+      });
+
+      res.status(201).json(newUser);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'User with this email or username already exists' });
       }
-    });
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: creatorId,
-        action: 'CREATE_USER',
-        details: `Created user ${name} (${role}) - ID: ${newUser.id}`
-      }
-    });
-
-    res.status(201).json(newUser);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+      throw error;
+    }
+  } catch (error) {
+    console.error('[USER] Create error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -79,29 +92,27 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    let users;
-
-    if (requesterRole === 'ADMIN') {
-      // Admins see everyone
-      users = await prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          role: true,
-          status: true,
-          createdAt: true
-        },
-        orderBy: { id: 'asc' }
-      });
-    } else {
+    if (requesterRole !== 'ADMIN') {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true
+      },
+      orderBy: { id: 'asc' }
+    });
+
     res.json(users);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[USER] Get all error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -118,47 +129,66 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: 'Invalid ID parameter' });
+    }
+
     // Permissions check
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const data: any = {};
-    if (name) data.name = name;
-    if (email) data.email = email;
-    if (username) data.username = username;
-    if (status) data.status = status;
-
-    if (password) {
-      data.password = await bcrypt.hash(password, 10);
+    // Prevent self-deactivation
+    if (targetUserId === requesterId && status === 'INACTIVE') {
+      return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: targetUserId },
-      data,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        status: true
-      }
-    });
+    const data: any = {};
+    if (name && typeof name === 'string') data.name = name;
+    if (email && typeof email === 'string') data.email = email;
+    if (username && typeof username === 'string') data.username = username;
+    if (status && ['ACTIVE', 'INACTIVE'].includes(status)) data.status = status;
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: requesterId,
-        action: 'UPDATE_USER',
-        details: `Updated user ${updatedUser.name} (ID: ${updatedUser.id})`
+    if (password && typeof password === 'string') {
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
       }
-    });
+      data.password = await bcrypt.hash(password, 12);
+    }
 
-    res.json(updatedUser);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id: targetUserId },
+        data,
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          role: true,
+          status: true
+        }
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: requesterId,
+          action: 'UPDATE_USER',
+          details: `Updated user ${updatedUser.name}`
+        }
+      });
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ error: 'Email or username already in use' });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('[USER] Update error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -178,24 +208,36 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'Access denied: Only Admins can delete users' });
     }
 
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: 'Invalid ID parameter' });
+    }
+
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Prevent deleting the last admin
+    if (targetUser.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last admin account' });
+      }
+    }
+
     await prisma.user.delete({ where: { id: targetUserId } });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         userId: requesterId,
         action: 'DELETE_USER',
-        details: `Deleted user ${targetUser.name} (ID: ${targetUser.id})`
+        details: `Deleted user ${targetUser.name}`
       }
     });
 
     res.json({ message: 'User deleted successfully' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[USER] Delete error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

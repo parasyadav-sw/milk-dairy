@@ -55,7 +55,6 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
     ]);
 
     // Graph aggregates
-    // 1. Daily milk collection trend (last 7 days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -77,15 +76,25 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
       };
     });
 
-    // 2. Village wise collection (top 5)
-    const villageCollections = await prisma.milkCollection.findMany({
-      include: { farmer: { select: { village: true } } }
+    // Village wise collection using groupBy instead of loading all records
+    const farmerVillageMap = await prisma.farmer.findMany({
+      select: { id: true, village: true }
+    });
+    const villageLookup: { [key: string]: string } = {};
+    farmerVillageMap.forEach((f: any) => { villageLookup[f.id] = f.village; });
+
+    // Get aggregated collections per farmer
+    const farmerCollections = await prisma.milkCollection.groupBy({
+      by: ['farmerId'],
+      _sum: { quantityLitres: true }
     });
 
     const villageMap: { [key: string]: number } = {};
-    villageCollections.forEach((col: any) => {
-      const v = col.farmer.village;
-      villageMap[v] = (villageMap[v] || 0) + col.quantityLitres;
+    farmerCollections.forEach((fc: any) => {
+      const village = villageLookup[fc.farmerId];
+      if (village) {
+        villageMap[village] = (villageMap[village] || 0) + (fc._sum.quantityLitres || 0);
+      }
     });
 
     const villageWise = Object.entries(villageMap)
@@ -93,7 +102,7 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
       .sort((a, b) => b.litres - a.litres)
       .slice(0, 5);
 
-    // 3. Employee performance (litres collected)
+    // Employee performance (litres collected)
     const employeeCollections = await prisma.milkCollection.groupBy({
       by: ['collectedById'],
       _sum: { quantityLitres: true }
@@ -136,11 +145,11 @@ export const getAdminDashboardStats = async (req: AuthRequest, res: Response) =>
         animals: JSON.parse(s.animals)
       }))
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[REPORT] Dashboard stats error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 
 export const getAuditLogs = async (req: AuthRequest, res: Response) => {
   try {
@@ -149,7 +158,8 @@ export const getAuditLogs = async (req: AuthRequest, res: Response) => {
       orderBy: { timestamp: 'desc' }
     });
     res.json(logs);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[REPORT] Audit logs error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import prisma from '../db';
+import prisma, { TransactionClient } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 export const applyLeave = async (req: AuthRequest, res: Response) => {
@@ -15,6 +15,14 @@ export const applyLeave = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Start date, end date, and reason are required' });
     }
 
+    if (typeof startDate !== 'string' || typeof endDate !== 'string') {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      return res.status(400).json({ error: 'Start date must be before or equal to end date' });
+    }
+
     const leave = await prisma.leave.create({
       data: {
         userId,
@@ -26,14 +34,15 @@ export const applyLeave = async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(leave);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[LEAVE] Apply error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const approveOrRejectLeave = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { status } = req.body; // 'APPROVED' or 'REJECTED'
+  const { status } = req.body;
 
   try {
     const approverId = req.user?.id;
@@ -48,6 +57,10 @@ export const approveOrRejectLeave = async (req: AuthRequest, res: Response) => {
     }
 
     const leaveId = parseInt(id);
+    if (isNaN(leaveId)) {
+      return res.status(400).json({ error: 'Invalid leave ID' });
+    }
+
     const existingLeave = await prisma.leave.findUnique({
       where: { id: leaveId },
       include: { user: true }
@@ -57,58 +70,55 @@ export const approveOrRejectLeave = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Leave request not found' });
     }
 
+    // Use transaction for leave approval and attendance creation
+    const updated = await prisma.$transaction(async (tx: TransactionClient) => {
+      const leaveUpdate = await tx.leave.update({
+        where: { id: leaveId },
+        data: {
+          status,
+          approvedById: approverId
+        }
+      });
 
-
-    const updated = await prisma.leave.update({
-      where: { id: leaveId },
-      data: {
-        status,
-        approvedById: approverId
-      }
-    });
-
-    // If approved, create attendance markers for those dates as "LEAVE"
-    if (status === 'APPROVED') {
-      try {
+      if (status === 'APPROVED') {
         const start = new Date(existingLeave.startDate);
         const end = new Date(existingLeave.endDate);
         const loop = new Date(start);
-        
+
         while (loop <= end) {
           const dateStr = loop.toISOString().split('T')[0];
-          
-          // Avoid duplicate attendance logs
-          const existingAtt = await prisma.attendance.findFirst({
-            where: { userId: existingLeave.userId, date: dateStr }
-          });
 
-          if (!existingAtt) {
-            await prisma.attendance.create({
+          try {
+            await tx.attendance.create({
               data: {
                 userId: existingLeave.userId,
                 date: dateStr,
                 status: 'LEAVE'
               }
             });
+          } catch (e: any) {
+            // Skip if attendance already exists for this date
+            if (e.code !== 'P2002') throw e;
           }
           loop.setDate(loop.getDate() + 1);
         }
-      } catch (err) {
-        console.error('Error inserting attendance leave markers:', err);
       }
-    }
 
-    await prisma.auditLog.create({
-      data: {
-        userId: approverId,
-        action: `${status}_LEAVE`,
-        details: `${status} leave for employee ${existingLeave.user.name} (ID: ${existingLeave.userId})`
-      }
+      await tx.auditLog.create({
+        data: {
+          userId: approverId,
+          action: `${status}_LEAVE`,
+          details: `${status} leave for employee ${existingLeave.user.name} (ID: ${existingLeave.userId})`
+        }
+      });
+
+      return leaveUpdate;
     });
 
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[LEAVE] Approve/reject error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -131,7 +141,6 @@ export const getLeaves = async (req: AuthRequest, res: Response) => {
         },
         orderBy: { createdAt: 'desc' }
       });
-
     } else {
       leaves = await prisma.leave.findMany({
         where: { userId },
@@ -143,7 +152,8 @@ export const getLeaves = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(leaves);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[LEAVE] Get error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

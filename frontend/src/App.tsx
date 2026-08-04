@@ -15,8 +15,13 @@ import { LiveTracking } from './pages/LiveTracking';
 import { FieldLocations } from './pages/FieldLocations';
 import { FieldLocationDetail } from './pages/FieldLocationDetail';
 
-// Route Guard to verify active JWT sessions
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: 'ADMIN' | 'EMPLOYEE';
+}
+
+// Route Guard to verify active JWT sessions and role
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -32,6 +37,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (requiredRole && user.role !== requiredRole && user.role !== 'ADMIN') {
+    return <Navigate to="/" replace />;
   }
 
   return <Layout>{children}</Layout>;
@@ -50,118 +59,156 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+// Error Boundary
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="min-h-screen flex items-center justify-center bg-ivory">
+          <div className="text-center space-y-4 p-8">
+            <h1 className="text-xl font-bold text-foreground">Something went wrong</h1>
+            <p className="text-muted">Please refresh the page or contact support.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-primary"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <DatabaseProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public Login Route */}
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } 
-            />
+    <ErrorBoundary>
+      <DatabaseProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public Login Route */}
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } 
+              />
 
-            {/* Protected Core Dashboard Routes */}
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <DashboardDispatcher />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/customers" 
-              element={
-                <ProtectedRoute>
-                  <Customers />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected Core Dashboard Routes */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardDispatcher />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/customers" 
+                element={
+                  <ProtectedRoute>
+                    <Customers />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/employees" 
-              element={
-                <ProtectedRoute>
-                  <Employees />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/employees" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <Employees />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/attendance" 
-              element={
-                <ProtectedRoute>
-                  <Attendance />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/attendance" 
+                element={
+                  <ProtectedRoute>
+                    <Attendance />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/potential-customers" 
-              element={
-                <ProtectedRoute>
-                  <PotentialCustomers />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/potential-customers" 
+                element={
+                  <ProtectedRoute>
+                    <PotentialCustomers />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/live-tracking" 
-              element={
-                <ProtectedRoute>
-                  <LiveTracking />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/live-tracking" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <LiveTracking />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/field-locations" 
-              element={
-                <ProtectedRoute>
-                  <FieldLocations />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/field-locations" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <FieldLocations />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/field-locations/employee/:userId" 
-              element={
-                <ProtectedRoute>
-                  <FieldLocationDetail />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/field-locations/employee/:userId" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <FieldLocationDetail />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/export" 
-              element={
-                <ProtectedRoute>
-                  <Export />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/export" 
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <Export />
+                  </ProtectedRoute>
+                } 
+              />
 
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } 
-            />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Fallback Redirection */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </DatabaseProvider>
+              {/* Fallback Redirection */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </DatabaseProvider>
+    </ErrorBoundary>
   );
 }

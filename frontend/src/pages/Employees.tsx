@@ -75,6 +75,10 @@ export const Employees: React.FC = () => {
       triggerToast('Password is required for new employees', 'error');
       return;
     }
+    if (!editingEmployee && password.length < 6) {
+      triggerToast('Password must be at least 6 characters', 'error');
+      return;
+    }
     try {
       if (editingEmployee) {
         const updateData: any = { name, username, email, role, status };

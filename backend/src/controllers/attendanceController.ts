@@ -10,29 +10,28 @@ export const clockIn = async (req: AuthRequest, res: Response) => {
     }
 
     const dateToday = new Date().toISOString().split('T')[0];
-    const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+    const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5);
 
-    // Check if already clocked in today
-    const existing = await prisma.attendance.findFirst({
-      where: { userId, date: dateToday }
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'Already clocked in today' });
-    }
-
-    const record = await prisma.attendance.create({
-      data: {
-        userId,
-        date: dateToday,
-        status: 'PRESENT',
-        clockIn: timeNow
+    // Use create with unique constraint to prevent race condition
+    try {
+      const record = await prisma.attendance.create({
+        data: {
+          userId,
+          date: dateToday,
+          status: 'PRESENT',
+          clockIn: timeNow
+        }
+      });
+      res.status(201).json(record);
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        return res.status(400).json({ error: 'Already clocked in today' });
       }
-    });
-
-    res.status(201).json(record);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+      throw e;
+    }
+  } catch (error) {
+    console.error('[ATTENDANCE] Clock-in error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -44,30 +43,36 @@ export const clockOut = async (req: AuthRequest, res: Response) => {
     }
 
     const dateToday = new Date().toISOString().split('T')[0];
-    const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+    const timeNow = new Date().toTimeString().split(' ')[0].substring(0, 5);
 
-    const existing = await prisma.attendance.findFirst({
+    // Atomic update: only update if clockOut is null (prevents race condition)
+    const result = await prisma.attendance.updateMany({
+      where: { userId, date: dateToday, clockOut: null },
+      data: { clockOut: timeNow }
+    });
+
+    if (result.count === 0) {
+      // Check if already clocked out or never clocked in
+      const existing = await prisma.attendance.findFirst({
+        where: { userId, date: dateToday }
+      });
+      if (!existing) {
+        return res.status(400).json({ error: 'No clock-in record found for today' });
+      }
+      if (existing.clockOut) {
+        return res.status(400).json({ error: 'Already clocked out today' });
+      }
+      return res.status(400).json({ error: 'Clock out failed' });
+    }
+
+    const updated = await prisma.attendance.findFirst({
       where: { userId, date: dateToday }
     });
 
-    if (!existing) {
-      return res.status(400).json({ error: 'No clock-in record found for today' });
-    }
-
-    if (existing.clockOut) {
-      return res.status(400).json({ error: 'Already clocked out today' });
-    }
-
-    const updated = await prisma.attendance.update({
-      where: { id: existing.id },
-      data: {
-        clockOut: timeNow
-      }
-    });
-
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ATTENDANCE] Clock-out error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -95,7 +100,8 @@ export const getAttendance = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(records);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[ATTENDANCE] Get error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -281,11 +281,11 @@ interface DatabaseContextType {
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
 
 // Secondary non-persisted client for creating new users
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 const adminAuthClient = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       persistSession: false,
@@ -1052,7 +1052,9 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
         loop.setDate(loop.getDate() + 1);
       }
-      await supabase.from('attendance').insert(attendanceRecords);
+      await supabase.from('attendance').insert(attendanceRecords).then(({ error: insertErr }) => {
+        if (insertErr) console.error('Failed to create leave attendance records:', insertErr);
+      });
     }
 
     await logAudit(approverId, `LEAVE_${status}`, `Leave request ID ${leaveId} was ${status}`);
@@ -1412,8 +1414,10 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const fetchLocationHistory = async (userId: string, date: string): Promise<EmployeeLocation[]> => {
-    const startOfDay = `${date}T00:00:00`;
-    const endOfDay = `${date}T23:59:59`;
+    const startOfDay = `${date}T00:00:00.000Z`;
+    const nextDay = new Date(date + 'T00:00:00Z');
+    nextDay.setDate(nextDay.getDate() + 1);
+    const endOfDay = nextDay.toISOString();
     const { data, error } = await supabase
       .from('employee_locations')
       .select('*, profiles(name)')

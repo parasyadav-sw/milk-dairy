@@ -52,7 +52,7 @@ export const AdminDashboard: React.FC = () => {
     if (password) userData.password = password;
     try {
       if (editingUser) { await updateUser(editingUser.id, userData); setSuccess('User updated successfully'); }
-      else { if (!password) { setError('Password is required'); return; } await addUser(userData); setSuccess('User registered successfully'); }
+      else { if (!password) { setError('Password is required'); return; } if (password.length < 6) { setError('Password must be at least 6 characters'); return; } await addUser(userData); setSuccess('User registered successfully'); }
       setTimeout(() => setShowUserModal(false), 800);
     } catch (err: any) { setError(err.message || 'Action failed'); }
   };

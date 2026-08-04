@@ -134,7 +134,7 @@ export const EmployeeDashboard: React.FC = () => {
         }
       } catch {}
     }
-  }, [gpsError, user?.id]);
+  }, [gpsError, user?.id, activeTripId]);
 
   // Stop sharing if clocked out
   useEffect(() => {
@@ -150,7 +150,7 @@ export const EmployeeDashboard: React.FC = () => {
         }
       } catch {}
     }
-  }, [isClockedIn, shareLocation, user?.id]);
+  }, [isClockedIn, shareLocation, user?.id, activeTripId]);
 
   // Clear sharing state on logout (database already cleared by Layout before logout)
   useEffect(() => {

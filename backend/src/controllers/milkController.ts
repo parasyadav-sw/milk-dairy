@@ -2,12 +2,9 @@ import { Response } from 'express';
 import prisma from '../db';
 import { AuthRequest } from '../middleware/auth';
 
-// Clean helper to calculate milk rate based on standard Fat & SNF pricing
-// Cows typically have Fat 3-5%, SNF 8-9%. Buffalos have Fat 6-9%, SNF 9-10%.
-// Standard Formula: Rate = (Fat * 5.0) + (SNF * 3.5)
 export const calculateMilkRate = (fat: number, snf: number): number => {
   const rate = (fat * 5.0) + (snf * 3.5);
-  return Math.round(rate * 100) / 100; // Round to 2 decimal places
+  return Math.round(rate * 100) / 100;
 };
 
 export const recordCollection = async (req: AuthRequest, res: Response) => {
@@ -31,16 +28,26 @@ export const recordCollection = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Missing required milk collection details' });
     }
 
+    const qty = parseFloat(quantityLitres);
+    const fat = parseFloat(fatPercent);
+    const snf = parseFloat(snfPercent);
+    const clrVal = clr ? parseFloat(clr) : null;
+
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ error: 'Invalid quantity' });
+    }
+    if (isNaN(fat) || fat < 0 || fat > 100) {
+      return res.status(400).json({ error: 'Invalid fat percentage' });
+    }
+    if (isNaN(snf) || snf < 0 || snf > 100) {
+      return res.status(400).json({ error: 'Invalid SNF percentage' });
+    }
+
     // Verify farmer exists
     const farmer = await prisma.farmer.findUnique({ where: { id: farmerId } });
     if (!farmer) {
       return res.status(404).json({ error: 'Farmer not found' });
     }
-
-    const qty = parseFloat(quantityLitres);
-    const fat = parseFloat(fatPercent);
-    const snf = parseFloat(snfPercent);
-    const clrVal = clr ? parseFloat(clr) : null;
 
     const rate = calculateMilkRate(fat, snf);
     const amount = Math.round((qty * rate) * 100) / 100;
@@ -61,9 +68,6 @@ export const recordCollection = async (req: AuthRequest, res: Response) => {
       }
     });
 
-
-
-    // Log action
     await prisma.auditLog.create({
       data: {
         userId: collectorId,
@@ -73,8 +77,9 @@ export const recordCollection = async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(collection);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[MILK] Record error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -84,18 +89,18 @@ export const getCollections = async (req: AuthRequest, res: Response) => {
   try {
     const filters: any = {};
 
-    if (farmerId) {
-      filters.farmerId = String(farmerId);
+    if (farmerId && typeof farmerId === 'string') {
+      filters.farmerId = farmerId;
     }
 
-    if (village) {
-      filters.farmer = { village: String(village) };
+    if (village && typeof village === 'string') {
+      filters.farmer = { village };
     }
 
-    if (startDate && endDate) {
+    if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
       filters.date = {
-        gte: String(startDate),
-        lte: String(endDate)
+        gte: startDate,
+        lte: endDate
       };
     }
 
@@ -109,7 +114,8 @@ export const getCollections = async (req: AuthRequest, res: Response) => {
     });
 
     res.json(collections);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[MILK] Get collections error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

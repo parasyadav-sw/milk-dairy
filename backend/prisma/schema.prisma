@@ -138,6 +138,8 @@ model Attendance {
   clockOut  String?  // "HH:MM"
   
   createdAt DateTime @default(now())
+
+  @@unique([userId, date])
 }
 
 model Leave {

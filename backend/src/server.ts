@@ -1,5 +1,8 @@
+import prisma from './db';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -22,32 +25,78 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Enable CORS & JSON Parsing
-app.use(cors());
-app.use(express.json());
+// Security headers
+app.use(helmet());
+
+// CORS - restrict to known origins
+app.use(cors({
+  origin: FRONTEND_URL,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Body parsing with size limits
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Global rate limiter
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+app.use(globalLimiter);
+
+// Auth-specific rate limiter (stricter)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later' },
+});
 
 // Set up uploads directory
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
-app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Configure Multer for File Uploads
+// Serve uploads only to authenticated users
+app.use('/uploads', authenticateJWT, express.static(UPLOADS_DIR));
+
+// Configure Multer for File Uploads with security limits
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOADS_DIR);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, uniqueSuffix + (allowed.includes(ext) ? ext : '.bin'));
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowed.includes(ext)) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  },
+});
 
 // --- PUBLIC ROUTES ---
-app.post('/api/auth/login', login);
+app.post('/api/auth/login', authLimiter, login);
 
 // --- AUTHENTICATED ROUTES ---
 app.get('/api/auth/profile', authenticateJWT, getProfile);
@@ -84,8 +133,6 @@ app.delete('/api/farmers/:id', authenticateJWT, requireRole(['ADMIN', 'EMPLOYEE'
 app.post('/api/surveys', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), createSurvey);
 app.get('/api/surveys', authenticateJWT, getSurveys);
 
-
-
 // Milk Collections
 app.post('/api/collections', authenticateJWT, requireRole(['EMPLOYEE', 'ADMIN']), recordCollection);
 app.get('/api/collections', authenticateJWT, getCollections);
@@ -109,15 +156,43 @@ app.get('/api/leaves', authenticateJWT, getLeaves);
 app.get('/api/reports/admin-dashboard', authenticateJWT, requireRole(['ADMIN']), getAdminDashboardStats);
 app.get('/api/reports/audit-logs', authenticateJWT, requireRole(['ADMIN']), getAuditLogs);
 
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('[ERROR]', err.message);
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+    }
+    return res.status(400).json({ error: 'File upload error' });
+  }
+  if (err.message === 'Only image files are allowed') {
+    return res.status(400).json({ error: err.message });
+  }
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start Server
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  // Seed the initial admin user
   await seedInitialAdmin();
+});
+
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('\nShutting down gracefully...');
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
 });
